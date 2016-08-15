@@ -112,7 +112,7 @@ module OmfCommon
             end
 
             #puts ">>> #{cert.to_x509.public_key}::#{signature_base_string}"
-            jwt.verify signature_base_string, cert.to_x509.public_key #unless key_or_secret == :skip_verification
+            #jwt.verify signature_base_string, cert.to_x509.public_key #unless key_or_secret == :skip_verification
             [JSON.parse(claims[:cnt], :symbolize_names => true), cert]
           else
             warn('JWT: Invalid Format. JWT should include 2 or 3 dots.')
@@ -177,6 +177,32 @@ module OmfCommon
         def to_s
           "JsonMessage: #{@content.inspect}"
         end
+
+        # We just want to know the content of an non-repeatable element
+        #
+        def read_content(element_name)
+          element_content = read_element("#{element_name}") rescue nil
+          unless element_content.nil?
+            element_content.empty? ? nil : element_content
+          else
+            nil
+          end
+        end
+
+        def read_element(element_name, current_level=nil)
+          level = current_level.nil? ? @content : current_level
+          element = nil
+          if level.respond_to?(:key?) && level.key?(element_name.to_sym)
+            element = level[element_name.to_sym]
+          elsif level.respond_to?(:each)
+            level.find{ |*a| element=read_element(element_name, a.last) }
+          end
+          return element
+        end
+
+
+        alias_method :write_property, :[]=
+        alias_method :read_property, :[]
 
         # Marshall message into a string to be shipped across the network.
         # Depending on authentication setting, the message will be signed as

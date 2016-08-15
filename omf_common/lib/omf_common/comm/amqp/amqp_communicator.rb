@@ -5,6 +5,8 @@
 
 require 'amqp'
 require 'omf_common/comm/amqp/amqp_topic'
+require 'eventmachine'
+require 'monitor'
 
 module AMQP
   class Channel
@@ -32,6 +34,7 @@ module OmfCommon
         # Initialize comms layer
         #
         def init(opts = {})
+          @lock = Monitor.new
           @opts = {
             #:ssl (Hash) TLS (SSL) parameters to use.
             heartbeat: 20, # (Fixnum) - default: 0 Connection heartbeat, in seconds. 0 means no heartbeat. Can also be configured server-side starting with RabbitMQ 3.0.
@@ -58,7 +61,14 @@ module OmfCommon
 
         # Shut down comms layer
         def disconnect(opts = {})
+          @lock.synchronize do
+            @normal_shutdown_mode = true
+          end
           info "Disconnecting..."
+
+          @session.close {
+            EventMachine.stop { exit }
+          }
         end
 
         # TODO: Should be thread safe and check if already connected

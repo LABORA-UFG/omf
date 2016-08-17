@@ -33,6 +33,11 @@ module OmfCommon
           elsif not properties.kind_of?(Hash)
             raise "Expected hash, but got #{properties.class}"
           end
+
+          if type.to_sym == :create
+            body[:rtype] ||= properties[:type]
+          end
+
           content = body.merge({
             op: type,
             mid: SecureRandom.uuid,
@@ -131,7 +136,6 @@ module OmfCommon
         def properties
           @properties
         end
-
 
         def has_properties?
           not @properties.empty?

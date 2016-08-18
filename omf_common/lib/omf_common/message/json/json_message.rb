@@ -185,9 +185,9 @@ module OmfCommon
         # We just want to know the content of an non-repeatable element
         #
         def read_content(element_name)
-          element_content = read_element("#{element_name}") rescue nil
-          unless element_content.nil?
-            element_content.empty? ? nil : element_content
+          element = read_element("#{element_name}") rescue nil
+          unless element.nil?
+            element.respond_to?(:empty?) && element.empty? ? nil : element
           else
             nil
           end

@@ -19,5 +19,6 @@ module OmfCommon
     end
   end
 
-  VERSION = version_of('omf_common')
+  #VERSION = version_of('omf_common')
+  VERSION = "6.2.4"
 end

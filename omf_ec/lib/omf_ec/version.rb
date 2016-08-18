@@ -6,5 +6,6 @@
 require 'omf_common/version'
 
 module OmfEc
-  VERSION = OmfCommon.version_of('omf_ec')
+  #VERSION = OmfCommon.version_of('omf_ec')
+  VERSION = "6.2.4"
 end

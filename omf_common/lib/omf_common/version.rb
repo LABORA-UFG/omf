@@ -4,7 +4,7 @@
 # By downloading or using this software you accept the terms and the liability disclaimer in the License.
 
 module OmfCommon
-  PROTOCOL_VERSION = "6.0"
+  PROTOCOL_VERSION = "6.3"
 
   def self.version_of(name)
     git_tag  = `git describe --tags 2> /dev/null`.chomp

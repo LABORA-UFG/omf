@@ -137,6 +137,11 @@ module OmfCommon
           @properties
         end
 
+        #TODO transfor properties into an object. For now it is a Hash.
+        def properties=(properties)
+          @properties=properties
+        end
+
         def has_properties?
           not @properties.empty?
         end

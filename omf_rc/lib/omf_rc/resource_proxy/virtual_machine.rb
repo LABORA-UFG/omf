@@ -390,4 +390,9 @@ module OmfRc::ResourceProxy::VirtualMachine
     end
   end
 
+  work :check_state_vm do |res|
+    result = res.send("check_vm_state_with_#{res.property.virt_mngt}")
+    res.inform(:state, Hashie::Mash.new({:state => result}))
+  end
+
 end

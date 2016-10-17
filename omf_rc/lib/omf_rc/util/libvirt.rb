@@ -43,10 +43,10 @@ module OmfRc::Util::Libvirt
     result = `#{cmd} 2>&1`
     if $?.exitstatus != 0
       res.log_inform_error "#{error_msg}: '#{result}'"
-      false
+      result
     else
       logger.info "#{success_msg}"
-      true
+      result
     end
   end
 
@@ -118,6 +118,13 @@ module OmfRc::Util::Libvirt
       logger.info "Now attached to existing VM '#{res.property.vm_name}'!"
     end
     found
+  end
+
+  work :check_vm_state_with_libvirt do |res|
+    cmd = "#{VIRSH} -c #{res.property.hypervisor_uri} domstate #{res.property.vm_name}"
+    result = res.execute_cmd(cmd, "Looking for VM state",
+                    "Cannot look for VM state", "VM state found!")
+    logger.info "RESULT = #{result}"
   end
 
 end

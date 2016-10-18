@@ -38,7 +38,7 @@ module OmfRc::Util::Vmbuilder
   VMBUILDER = "/usr/bin/vmbuilder"
 
   VMBUILDER_DEFAULT = Hashie::Mash.new({
-                      cpus: 1, mem: 512,
+                      mem: 512,
                       rootsize: 20000, overwrite: true,
                       ip: nil, mask: nil, net: nil, bcast: nil, 
                       gw: nil, dns: nil 

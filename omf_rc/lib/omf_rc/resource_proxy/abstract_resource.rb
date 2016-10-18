@@ -490,12 +490,12 @@ class OmfRc::ResourceProxy::AbstractResource
   def execute_omf_operation(message, obj, topic)
     begin
       response_h = handle_message(message, obj)
-    rescue  => ex
+    rescue  => e
       err_resp = message.create_inform_reply_message(nil, {}, src: resource_address)
-      err_resp[:reason] = ex.to_s
-      error "Encountered exception, returning ERROR message"
-      debug ex.message
-      debug ex.backtrace.join("\n")
+      err_resp[:reason] = e.to_s
+      error "Encountered exception: #{e.message}, returning ERROR message"
+      debug e.message
+      debug e.backtrace.join("\n")
       return inform(:error, err_resp, topic)
     end
 
@@ -564,12 +564,12 @@ class OmfRc::ResourceProxy::AbstractResource
         end
         # self here is the parent
         self.inform(:creation_ok, response)
-      rescue  => ex
+      rescue  => e
         err_resp = message.create_inform_reply_message(nil, {}, src: resource_address)
-        err_resp[:reason] = ex.to_s
-        error "Encountered exception, returning ERROR message"
-        debug ex.message
-        debug ex.backtrace.join("\n")
+        err_resp[:reason] = e.to_s
+        error "Encountered exception: #{e.message}, returning ERROR message"
+        debug e.message
+        debug e.backtrace.join("\n")
         return self.inform(:error, err_resp)
       end
     end)

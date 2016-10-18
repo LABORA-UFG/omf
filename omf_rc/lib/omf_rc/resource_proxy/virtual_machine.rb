@@ -194,7 +194,7 @@
 # @see OmfRc::Util::Libvirt
 # @see OmfRc::Util::Vmbuilder
 module OmfRc::ResourceProxy::VirtualMachine
-  include OmfRc::ResourceProxyDSL 
+  include OmfRc::ResourceProxyDSL
 
   register_proxy :virtual_machine
   utility :common_tools
@@ -217,7 +217,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   VM_OS_DEFAULT = 'ubuntu'
   # Default OMF v6 parameters for the Resource Controller on the VM
   OMF_DEFAULT = Hashie::Mash.new({
-                server: 'srv.mytestbed.net', 
+                server: 'srv.mytestbed.net',
                 user: nil, password: nil,
                 topic: nil
                 })
@@ -253,7 +253,7 @@ module OmfRc::ResourceProxy::VirtualMachine
     if opts.kind_of? Hash
       if res.property.omf_opts.empty?
         res.property.omf_opts = OMF_DEFAULT.merge(opts)
-      else 
+      else
         res.property.omf_opts = res.property.omf_opts.merge(opts)
       end
     else
@@ -271,7 +271,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   #
   configure :vm_name do |res, name|
     res.property.image_path = "#{res.property.image_directory}/#{name}"
-    res.property.vm_name = name            
+    res.property.vm_name = name
   end
 
   # Configure the directory for the disk image of the VM associated to this 
@@ -283,7 +283,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   #
   configure :image_directory do |res, name|
     res.property.image_path = "#{name}/#{res.property.vm_name}"
-    res.property.image_directory = name            
+    res.property.image_directory = name
   end
 
   # Configure the next action to execute for this VM Proxy.
@@ -299,10 +299,13 @@ module OmfRc::ResourceProxy::VirtualMachine
     res.property.action = value
   end
 
-  work :build_vm do |res|    
+  work :build_vm do |res|
     res.log_inform_warn "Trying to build an already built VM, make sure to "+
       "have the 'overwrite' property set to true!" if res.property.ready
-    if res.property.state.to_sym == :stopped
+
+    vm_state = res.check_state_vm(res)
+
+    if vm_state.include? "Domain not found"
       res.property.ready = res.send("build_img_with_#{res.property.img_builder}")
       res.inform(:status, Hashie::Mash.new({:status => {:ready => res.property.ready}}))
     else
@@ -318,13 +321,15 @@ module OmfRc::ResourceProxy::VirtualMachine
           "'#{res.property.vm_name}'): definition path not set "+
           "or file does not exist (path: '#{res.property.vm_definition}')"
     else
-      if res.property.state.to_sym == :stopped
+      vm_state = res.check_state_vm(res)
+
+      if vm_state == "shut off"
         res.property.ready = res.send("define_vm_with_#{res.property.virt_mngt}")
         res.inform(:status, Hashie::Mash.new({:status => {:ready => res.property.ready}}))
       else
         res.log_inform_warn "Cannot define VM: it is not stopped"+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
-      end 
+      end
     end
   end
 
@@ -333,13 +338,15 @@ module OmfRc::ResourceProxy::VirtualMachine
         res.log_inform_error "Cannot attach VM, name not set"+
           "(name: '#{res.property.vm_name})'"
     else
-      if res.property.state.to_sym == :stopped
+      vm_state = res.check_state_vm(res)
+
+      if vm_state == "shut off"
         res.property.ready = res.send("attach_vm_with_#{res.property.virt_mngt}")
         res.inform(:status, Hashie::Mash.new({:status => {:ready => res.property.ready}}))
       else
         res.log_inform_warn "Cannot attach VM: it is not stopped"+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
-      end 
+      end
     end
   end
 
@@ -349,20 +356,23 @@ module OmfRc::ResourceProxy::VirtualMachine
       res.log_inform_error "Cannot clone VM: name or directory not set "+
         "(name: '#{res.property.vm_name}' - dir: '#{res.property.image_directory}')"
     else
-      if res.property.state.to_sym == :stopped
+      vm_state = res.check_state_vm(res)
+
+      if vm_state == "shut off"
         res.property.ready = res.send("clone_vm_with_#{res.property.virt_mngt}")
         res.inform(:status, Hashie::Mash.new({:status => {:ready => res.property.ready}}))
       else
         res.log_inform_warn "Cannot clone VM: it is not stopped"+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
-      end 
+      end
     end
   end
 
   work :stop_vm do |res|
-    if res.property.state.to_sym == :running
-      success = res.send("stop_vm_with_#{res.property.virt_mngt}")
-      res.property.state = :stopped if success
+    vm_state = res.check_state_vm(res)
+
+    if vm_state == "running"
+      res.send("stop_vm_with_#{res.property.virt_mngt}")
     else
       res.log_inform_warn "Cannot stop VM: it is not running "+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
@@ -370,9 +380,10 @@ module OmfRc::ResourceProxy::VirtualMachine
   end
 
   work :run_vm do |res|
-    if res.property.state.to_sym == :stopped && res.property.ready
-      success = res.send("run_vm_with_#{res.property.virt_mngt}")
-      res.property.state = :running if success
+    vm_state = res.check_state_vm(res)
+
+    if vm_state == "shut off"
+      res.send("run_vm_with_#{res.property.virt_mngt}")
     else
       res.log_inform_warn "Cannot run VM: it is not stopped or ready yet "+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
@@ -380,9 +391,10 @@ module OmfRc::ResourceProxy::VirtualMachine
   end
 
   work :delete_vm do |res|
-    if res.property.state.to_sym == :stopped && res.property.ready     
-      success = res.send("delete_vm_with_#{res.property.virt_mngt}")
-      res.property.ready = false if success
+    vm_state = res.check_state_vm(res)
+
+    if vm_state == "shut off"
+      res.send("delete_vm_with_#{res.property.virt_mngt}")
     else
       res.log_inform_warn "Cannot delete VM: it is not stopped or ready yet "+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state} "+
@@ -393,6 +405,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   work :check_state_vm do |res|
     result = res.send("check_vm_state_with_#{res.property.virt_mngt}")
     res.inform(:state, Hashie::Mash.new({:state => result}))
+    result
   end
 
 end

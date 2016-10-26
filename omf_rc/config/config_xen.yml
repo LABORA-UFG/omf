@@ -16,20 +16,8 @@ resources:
     user: testbed
     password: lab251
     topic: <%= Socket.gethostname %>
-  ubuntu_opts:
-    suite: precise
-    arch: amd64
-    user: testbed
-    pass: lab251
-    mirror: http://archive.ubuntu.com/ubuntu/
-  virt_install_opts:
-    name: vm-default
-    vcpus: 1
-    ram: 1024
-    os-type: linux
-    os-variant: ubuntuprecise
-    disk: path=/var/lib/libvirt/images/vm-name.img,size=5
-    network: bridge=xenbr0
   hypervisor: xen
   hypervisor_uri: xen+ssh://vinicius@10.16.88.2/
   virt_install_path: /usr/bin/virt-install
+  image_template_path: /root/images_templates
+  image_path: /var/lib/libvirt/images

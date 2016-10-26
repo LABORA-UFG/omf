@@ -200,6 +200,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   utility :common_tools
   utility :libvirt
   utility :vmbuilder
+  utility :virt_install
 
   # Default Hypervisor to use
   HYPERVISOR_DEFAULT = :kvm
@@ -208,7 +209,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   # Default virtualisation management tool to use
   VIRTUAL_MNGT_DEFAULT = :libvirt
   # Default VM image building tool to use
-  IMAGE_BUILDER_DEFAULT = :vmbuilder
+  IMAGE_BUILDER_DEFAULT = :virt_install
   # Default prefix to use for the VM's name
   VM_NAME_DEFAULT_PREFIX = "vm"
   # Default directory to store the VM's disk image
@@ -238,6 +239,14 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :vm_original_clone, :default => ''
   property :vm_os, :default => VM_OS_DEFAULT
   property :omf_opts, :default => OMF_DEFAULT
+
+  # Properties to run ssh command
+  property :ssh_params, :default => {
+      ip_address: "127.0.0.1",
+      port: 22,
+      user: "root",
+      key_file: "/root/.ssh/id_rsa"
+  }
 
   # Configure the OMF property of this VM Proxy.
   # These are the parameters to pass to an OMF v6 Resource Controller

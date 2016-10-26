@@ -49,7 +49,7 @@
 #
 # USAGE NOTES:
 #
-# A VirtualMachine Proxy is an interface to an underlying VM resource on a 
+# A Hypervisor Proxy is an interface to an underlying VM resource on a
 # physical resource. When a VM Proxy is created, it is not necessarily yet
 # associated with such a VM resource (unless the original 'create' command
 # for this VM Proxy had some optional property configuration as described
@@ -193,10 +193,10 @@
 #
 # @see OmfRc::Util::Libvirt
 # @see OmfRc::Util::Vmbuilder
-module OmfRc::ResourceProxy::VirtualMachine
+module OmfRc::ResourceProxy::Hypervisor
   include OmfRc::ResourceProxyDSL
 
-  register_proxy :virtual_machine
+  register_proxy :hypervisor_rc
   utility :common_tools
   utility :libvirt
   utility :vmbuilder

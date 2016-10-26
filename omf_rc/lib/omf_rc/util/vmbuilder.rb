@@ -30,7 +30,7 @@
 #
 # Utility dependencies: common_tools
 #
-# @see OmfRc::ResourceProxy::VirtualMachine
+# @see OmfRc::ResourceProxy::Hypervisor
 #
 module OmfRc::Util::Vmbuilder
   include OmfRc::ResourceProxyDSL

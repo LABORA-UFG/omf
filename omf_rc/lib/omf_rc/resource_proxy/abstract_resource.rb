@@ -71,8 +71,8 @@ end
 # * {OmfRc::ResourceProxy::Package Package}
 #
 # Creating virtual machines
-# * {OmfRc::ResourceProxy::VirtualMachineFactory VirtualMachineFactory}
-# * {OmfRc::ResourceProxy::VirtualMachine VirtualMachine}
+# * {OmfRc::ResourceProxy::HypervisorFactory HypervisorFactory}
+# * {OmfRc::ResourceProxy::Hypervisor Hypervisor}
 #
 # @see OmfRc::ResourceFactory
 # @see OmfRc::ResourceProxyDSL

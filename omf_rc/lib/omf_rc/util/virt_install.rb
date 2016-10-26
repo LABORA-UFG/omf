@@ -30,7 +30,7 @@
 #
 # Utility dependencies: common_tools
 #
-# @see OmfRc::ResourceProxy::VirtualMachine
+# @see OmfRc::ResourceProxy::Hypervisor
 #
 module OmfRc::Util::VirtInstall
   include OmfRc::ResourceProxyDSL
@@ -110,12 +110,6 @@ module OmfRc::Util::VirtInstall
     end
 
     cmd += " --import"
-
-    # find the ips
-    # for mac in macs.split("\\n") do
-    #   puts `arp -e | grep #{mac}`
-    # end
-    # sudo nmap -sn 10.16.88.0/24
 
     logger.info "Building VM with: '#{cmd}'"
     result = `#{cmd} 2>&1`

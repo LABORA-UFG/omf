@@ -30,12 +30,12 @@
 # Utility dependencies: common_tools
 #
 # This VM Factory Proxy is the resource entity that can create VM Proxies.
-# @see OmfRc::ResourceProxy::VirtualMachine
+# @see OmfRc::ResourceProxy::Hypervisor
 #
-module OmfRc::ResourceProxy::VirtualMachineFactory
+module OmfRc::ResourceProxy::HypervisorFactory
   include OmfRc::ResourceProxyDSL 
 
-  register_proxy :virtual_machine_factory
+  register_proxy :hypervisor_factory
   utility :common_tools
 
   hook :before_ready do |res|
@@ -44,7 +44,7 @@ module OmfRc::ResourceProxy::VirtualMachineFactory
   end
 
   hook :before_create do |res, type, opts = nil|
-    if type.to_sym != :virtual_machine
+    if type.to_sym != :hypervisor_rc
       raise "This resource only creates VM! (Cannot create a resource: #{type})"
     end
   end

@@ -4,7 +4,7 @@
 #environment: development
 
 communication:
-  url: amqp://testbed:lab251@10.16.88.11
+  url: amqp://testbed:lab251@192.168.1.9
 
 resources:
 - type: virtual_machine
@@ -12,12 +12,12 @@ resources:
   image_directory: /home/vinicius/omf6-images
   img_builder: virt_install
   omf_opts:
-    server: amqp://testbed:lab251@10.16.88.11
+    server: amqp://testbed:lab251@192.168.1.9
     user: testbed
     password: lab251
     topic: <%= Socket.gethostname %>
   hypervisor: xen
-  hypervisor_uri: xen+ssh://vinicius@10.16.88.2/
+  hypervisor_uri: xen+ssh://vinicius@192.168.1.2/
   virt_install_path: /usr/bin/virt-install
   image_template_path: /root/images_templates
-  image_path: /var/lib/libvirt/images
+  image_final_path: /var/lib/libvirt/images

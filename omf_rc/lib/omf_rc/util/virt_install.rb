@@ -49,6 +49,8 @@ module OmfRc::Util::VirtInstall
 
   property :virt_install_path, :default => VIRT_INSTALL_PATH
   property :vm_opts, :default => VM_OPTS_DEFAULT
+  property :image_template_path, :default => "/root/images_templates"
+  property :image_final_path, :default => "/var/lib/libvirt/images"
 
   %w(vm_opts ubuntu).each do |prefix|
     prop = "#{prefix}_opts"
@@ -80,36 +82,40 @@ module OmfRc::Util::VirtInstall
 
   work :build_img_with_virt_install do |res|
     # Construct the virt-install command
+    cmd = ""
+
     cmd += res.property.use_sudo ? "sudo " : ""
 
-    cmd += "#{VIRT_INSTALL_PATH} --connect #{res.property.hypervisor}" +
-        "-n #{res.property.vm_name} "
-    "--graphics none"
-    "-v" #for full virtualization
+    cmd += "#{VIRT_INSTALL_PATH} --connect #{res.property.hypervisor_uri} " +
+        " -n #{res.property.vm_name} " +
+        " --graphics none " +
+        " -v " #for full virtualization
+
     # Add virt-install options
     res.property.vm_opts.each do |k, v|
+      puts "VALOR DA PROPRIEDADE = #{k} = #{v}"
       if k.to_sym == :overwrite
-        cmd += "-o " if v
+        cmd += " -o " if v
       elsif k == "bridges"
         v.each do |bridge_name|
-          cmd += "-w bridge=#{bridge_name}"
+          cmd += " -w bridge=#{bridge_name}"
         end
       elsif k == "disk"
-        image_name = "#{res.property.image_path}/#{res.property.image}_#{res.property.vm_name}_#{Time.now.to_i}"
+        image_name = "#{res.property.image_final_path}/#{res.property.image}_#{res.property.vm_name}_#{Time.now.to_i}"
         res.create_image(image_name)
-        cmd += "disk path=#{image_name}"
+        cmd += " --disk path=#{image_name}"
       else
-        cmd += "--#{k.to_s} #{v} " unless v.nil?
+        cmd += " --#{k.to_s} #{v} " unless v.nil?
       end
     end
 
-    cmd += "--import"
+    cmd += " --import"
 
     # find the ips
     # for mac in macs.split("\\n") do
     #   puts `arp -e | grep #{mac}`
     # end
-    #sudo nmap -sn 10.16.88.0/24
+    # sudo nmap -sn 10.16.88.0/24
 
     logger.info "Building VM with: '#{cmd}'"
     result = `#{cmd} 2>&1`
@@ -125,7 +131,8 @@ module OmfRc::Util::VirtInstall
   work :create_image do |res, image_name|
     cmd = "cp #{res.property.image_template_path}/#{res.property.image} " +
         "#{image_name}"
-    ovs_out = res.ssh_command(res.property.user, res.property.ip_address, res.property.port, res.property.key_file,
+    ovs_out = res.ssh_command(res.property.ssh_params.user, res.property.ssh_params.ip_address,
+                              res.property.ssh_params.port, res.property.ssh_params.key_file,
                               cmd)
     ovs_out = ovs_out.delete("\n")
     ovs_out

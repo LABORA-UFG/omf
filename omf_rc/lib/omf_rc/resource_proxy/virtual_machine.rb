@@ -272,6 +272,20 @@ module OmfRc::ResourceProxy::VirtualMachine
     res.property.omf_opts
   end
 
+  configure :vm_opts do |res, opts|
+    if opts.kind_of? Hash
+      if res.property.vm_opts.empty?
+        res.property.vm_opts = opts
+      else
+        res.property.vm_opts = opts
+      end
+    else
+      res.log_inform_error "OMF option configuration failed! "+
+                               "Options not passed as Hash (#{opts.inspect})"
+    end
+    res.property.vm_opts
+  end
+
   # Configure the name for the VM associated to this VM Proxy.
   # Changing this name will also change the path for the VM's disk image:
   #    image_path = image_directory + "/" + vm_name

@@ -10,13 +10,19 @@ module OmfRc::ResourceProxy::VirtualMachine
     output
   end
 
-  work :change_hostname do |res, hostname|
-    `echo #{hostname} > /etc/hostname`
-    #TODO change hostname at /etc/hosts
+  work :change_hostname do |res, new_hostname|
+    current_hostname = File.read('/etc/hostname')
+    File.write('/etc/hostname', new_hostname)
+
+    hosts_content = File.read('/etc/hosts')
+    hosts_content = hosts_content.gsub(current_hostname, new_hostname)
+
+    File.write('/etc/hosts', hosts_content)
   end
 
   work :create_user do |res, user, password|
-    `useradd #{user} -p $(openssl passwd -1 #{password}) -m -s /bin/bash`
+    pwd = password.crypt("$5$a1")
+    `useradd #{user} -p #{pwd} -m -s /bin/bash`
   end
 
 end

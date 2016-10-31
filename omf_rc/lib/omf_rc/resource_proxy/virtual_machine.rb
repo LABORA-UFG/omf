@@ -1,13 +1,25 @@
-
 module OmfRc::ResourceProxy::VirtualMachine
   include OmfRc::ResourceProxyDSL
 
   register_proxy :virtual_machine
-  utility :common_tools
 
-  request :vm_ip do |res, interface|
-    output = `ip -f inet -o addr show #{interface}|cut -d\\  -f 7 | cut -d/ -f 1`
+  utility :common_tools
+  utility :ip
+
+  property :if_name, :default => "eth0"
+
+  configure :if_name do |res, value|
+    res.property.if_name = value
+  end
+
+  request :vm_ip do |res|
+    output = `ip -f inet -o addr show #{res.property.if_name}|cut -d\\  -f 7 | cut -d/ -f 1`
+    output = output.delete("\n")
     output
+  end
+
+  configure :hostname do |res, value|
+    res.change_hostname(value)
   end
 
   work :change_hostname do |res, new_hostname|

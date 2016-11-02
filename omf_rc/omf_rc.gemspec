@@ -29,4 +29,5 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "omf_common", "= #{OmfCommon::VERSION}"
   s.add_runtime_dependency "cocaine"
   s.add_runtime_dependency "facter"
+  s.add_runtime_dependency "macaddr", "= 1.7.1"
 end

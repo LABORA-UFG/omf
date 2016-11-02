@@ -13,9 +13,11 @@ module OmfRc::ResourceProxy::VirtualMachine
   end
 
   request :vm_ip do |res|
-    output = `ip -f inet -o addr show #{res.property.if_name}|cut -d\\  -f 7 | cut -d/ -f 1`
-    output = output.delete("\n")
-    output
+    cmd = "/sbin/ip -f inet -o addr show #{res.property.if_name} | cut -d\\  -f 7 | cut -d/ -f 1"
+
+    res.execute_cmd(cmd, "Getting the ip of #{res.property.if_name}",
+                    "It was not possible to get the IP!", "IP was successfully got!")
+
   end
 
   configure :hostname do |res, value|
@@ -32,9 +34,24 @@ module OmfRc::ResourceProxy::VirtualMachine
     File.write('/etc/hosts', hosts_content)
   end
 
-  work :create_user do |res, user, password|
-    pwd = password.crypt("$5$a1")
-    `useradd #{user} -p #{pwd} -m -s /bin/bash`
+  configure :user do |res, opts|
+    user_data = opts[0]
+    username = user_data[:username]
+    password = user_data[:password]
+    res.create_user(username, password)
+  end
+
+  work :create_user do |res, username, password|
+    pwd = password.crypt("Xn1d9a1")
+    cmd = "/usr/sbin/useradd #{username} -p #{pwd} -m -s /bin/bash"
+
+    res.execute_cmd(cmd, "Adding a new user...",
+                    "Cannot add the user!", "User was successfully added!")
+  end
+
+  request :vm_mac do |res|
+    require 'macaddr'
+    Mac.address
   end
 
 end

@@ -329,8 +329,8 @@ module OmfRc::ResourceProxy::Hypervisor
     vm_state = res.check_state_vm(res)
 
     if vm_state.include? "Domain not found"
-      res.property.ready = res.send("build_img_with_#{res.property.img_builder}")
-      res.property.ready
+      res.property.vm_topic = res.send("build_img_with_#{res.property.img_builder}")
+      res.inform(:status, {vm_topic: "#{res.property.vm_topic}"})
     else
       res.log_inform_error "Cannot build VM image: it is not stopped"+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state} "+

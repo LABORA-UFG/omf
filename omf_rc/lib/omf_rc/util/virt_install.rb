@@ -92,6 +92,8 @@ module OmfRc::Util::VirtInstall
         " --graphics none " +
         " -v " #for full virtualization
 
+    template_img = ""
+
     # Add virt-install options
     res.property.vm_opts.each do |k, v|
       if k.to_sym == :overwrite
@@ -102,6 +104,7 @@ module OmfRc::Util::VirtInstall
         end
       elsif k == "disk"
         image_name = "#{res.property.image_final_path}/#{v.image}_#{res.property.vm_name}_#{Time.now.to_i}.img"
+        template_img = v.image.gsub(".img", "")
         res.create_image(v.image, image_name)
         cmd += " --disk path=#{image_name}"
       else
@@ -118,9 +121,8 @@ module OmfRc::Util::VirtInstall
       false
     else
       logger.info "VM image built successfully!"
-      mac_address = res.get_mac_addr(res.property.vm_name)
-      vm_topic = "#{res.property.vm_name}-#{mac_address}"
-      res.log_inform_warn "VM TOPIC: '#{vm_topic}'"
+      vm_topic = res.get_mac_addr(res.property.vm_name)
+      logger.info "The topic to access the VM is: #{vm_topic}"
       vm_topic
     end
   end

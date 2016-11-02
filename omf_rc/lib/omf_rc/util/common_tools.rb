@@ -27,6 +27,18 @@ module OmfRc::Util::CommonTools
     end
   end
 
+  work :execute_cmd do |res, cmd, intro_msg, error_msg, success_msg|
+    logger.info "#{intro_msg} with: '#{cmd}'"
+    result = `#{cmd} 2>&1`
+    if $?.exitstatus != 0
+      res.log_inform_error "#{error_msg}: '#{result}'"
+      result.strip
+    else
+      logger.info "#{success_msg}"
+      result.strip
+    end
+  end
+
   # This utility block returns true if its given value parameter is a Boolean,
   # which in Ruby means that it is either of the class TrueClass or FalseClass
   #

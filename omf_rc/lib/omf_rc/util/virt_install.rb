@@ -37,6 +37,7 @@ module OmfRc::Util::VirtInstall
 
   utility :ssh
 
+  VIRSH = "/usr/bin/virsh"
   VIRT_INSTALL_PATH = "/usr/bin/virt-install"
 
   VM_OPTS_DEFAULT = Hashie::Mash.new({
@@ -93,7 +94,6 @@ module OmfRc::Util::VirtInstall
 
     # Add virt-install options
     res.property.vm_opts.each do |k, v|
-      puts "VALOR DA PROPRIEDADE = #{k} = #{v}"
       if k.to_sym == :overwrite
         cmd += " -o " if v
       elsif k == "bridges"
@@ -101,8 +101,8 @@ module OmfRc::Util::VirtInstall
           cmd += " -w bridge=#{bridge_name}"
         end
       elsif k == "disk"
-        image_name = "#{res.property.image_final_path}/#{res.property.image}_#{res.property.vm_name}_#{Time.now.to_i}"
-        res.create_image(image_name)
+        image_name = "#{res.property.image_final_path}/#{v.image}_#{res.property.vm_name}_#{Time.now.to_i}.img"
+        res.create_image(v.image, image_name)
         cmd += " --disk path=#{image_name}"
       else
         cmd += " --#{k.to_s} #{v} " unless v.nil?
@@ -118,18 +118,31 @@ module OmfRc::Util::VirtInstall
       false
     else
       logger.info "VM image built successfully!"
-      true
+      mac_address = res.get_mac_addr(res.property.vm_name)
+      vm_topic = "#{res.property.vm_name}-#{mac_address}"
+      res.log_inform_warn "VM TOPIC: '#{vm_topic}'"
+      vm_topic
     end
   end
 
-  work :create_image do |res, image_name|
-    cmd = "cp #{res.property.image_template_path}/#{res.property.image} " +
+  work :create_image do |res, template_image, image_name|
+    cmd = "cp #{res.property.image_template_path}/#{template_image} " +
         "#{image_name}"
-    ovs_out = res.ssh_command(res.property.ssh_params.user, res.property.ssh_params.ip_address,
+    logger.info "Creating VM image..."
+    output = res.ssh_command(res.property.ssh_params.user, res.property.ssh_params.ip_address,
                               res.property.ssh_params.port, res.property.ssh_params.key_file,
                               cmd)
-    ovs_out = ovs_out.delete("\n")
-    ovs_out
+    output = output.delete("\n")
+    output
+  end
+
+  work :get_mac_addr do |res, vm_name|
+    cmd = "virsh -c #{res.property.hypervisor_uri} dumpxml #{vm_name} | grep 'mac address' | cut -d\\' -f2"
+
+    output = res.execute_cmd(cmd, "Getting mac address...",
+                    "Cannot get the mac address!", "Mac address was successfully got!")
+    output = output.split("\n")
+    output[0]
   end
 
 end

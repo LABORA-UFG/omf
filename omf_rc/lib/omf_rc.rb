@@ -5,6 +5,7 @@
 
 require 'omf_common'
 require 'omf_rc/version'
+require 'macaddr'
 
 module OmfRc
   module ResourceProxy; end

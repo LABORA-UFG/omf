@@ -196,7 +196,7 @@
 module OmfRc::ResourceProxy::Hypervisor
   include OmfRc::ResourceProxyDSL
 
-  register_proxy :hypervisor_rc
+  register_proxy :hypervisor_rc #, :create_by => :hypervisor_factory
   utility :common_tools
   utility :libvirt
   utility :vmbuilder
@@ -248,6 +248,8 @@ module OmfRc::ResourceProxy::Hypervisor
       key_file: "/root/.ssh/id_rsa"
   }
 
+  property :vm_opts
+
   # Configure the OMF property of this VM Proxy.
   # These are the parameters to pass to an OMF v6 Resource Controller
   # installed (or to be installed) on the VM associated to this VM Proxy.
@@ -274,11 +276,7 @@ module OmfRc::ResourceProxy::Hypervisor
 
   configure :vm_opts do |res, opts|
     if opts.kind_of? Hash
-      if res.property.vm_opts.empty?
         res.property.vm_opts = opts
-      else
-        res.property.vm_opts = opts
-      end
     else
       res.log_inform_error "OMF option configuration failed! "+
                                "Options not passed as Hash (#{opts.inspect})"
@@ -318,7 +316,9 @@ module OmfRc::ResourceProxy::Hypervisor
   #
   configure :action do |res, value|
     act = value.to_s.downcase
-    res.send("#{act}_vm")
+    Thread.new {
+      res.send("#{act}_vm")
+    }
     res.property.action = value
   end
 
@@ -330,12 +330,16 @@ module OmfRc::ResourceProxy::Hypervisor
 
     if vm_state.include? "Domain not found"
       res.property.ready = res.send("build_img_with_#{res.property.img_builder}")
-      res.inform(:status, Hashie::Mash.new({:status => {:ready => res.property.ready}}))
+      res.property.ready
     else
       res.log_inform_error "Cannot build VM image: it is not stopped"+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state} "+
         "- path: '#{res.property.image_path}')"
     end
+  end
+
+  configure_all do |res, conf_props, conf_result|
+    conf_props.each { |k, v| conf_result[k] = res.__send__("configure_#{k}", v) }
   end
 
   work :define_vm do |res|
@@ -427,7 +431,7 @@ module OmfRc::ResourceProxy::Hypervisor
 
   work :check_state_vm do |res|
     result = res.send("check_vm_state_with_#{res.property.virt_mngt}")
-    res.inform(:state, Hashie::Mash.new({:state => result}))
+    #res.inform(:state, Hashie::Mash.new({:state => result}))
     result
   end
 

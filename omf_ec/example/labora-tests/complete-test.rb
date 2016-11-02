@@ -229,5 +229,5 @@ OmfCommon.comm.subscribe('maq3-switch-ovs') do |ovs|
     error ovs.inspect
   end
 
-  #after(70) { info 'Disconnecting ...'; OmfCommon.comm.disconnect }
+  after(70) { info 'Disconnecting ...'; OmfCommon.comm.disconnect }
 end

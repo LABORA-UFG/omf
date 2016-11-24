@@ -46,7 +46,9 @@ module OmfEc
         }
       )
 
-      @cmd_opts = Mash.new
+      @cmd_opts = Mash.new(
+          config_file: "/etc/omf_ec/config.yml"
+      )
 
       @argv = ARGV.dup
     end

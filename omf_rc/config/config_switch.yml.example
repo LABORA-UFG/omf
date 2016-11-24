@@ -1,0 +1,16 @@
+---
+# default topic name is this machine's hostname
+# this is to ensure that every RC has its own topic and AMQP account
+#environment: development
+
+communication:
+  url: amqp://testbed:lab251@192.168.1.9
+
+resources:
+- type: switch
+  uid: switch-pica8
+  stype: "pica8"
+  ip_address: "127.0.0.1"
+  user: root
+  port: 22
+  key_file: "/root/.ssh/id_rsa"

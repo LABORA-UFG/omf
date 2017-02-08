@@ -60,7 +60,7 @@ module OmfRc::Util::OVS
   work :handle_add_flow_ovs_configuration do |res, flow|
     ovs_out = res.ssh_command(res.property.user, res.property.ip_address, res.property.port, res.property.key_file,
                               "#{res.property.ovs_bin_dir}/ovs-ofctl add-flow #{res.property.bridge} #{flow}")
-    message = if ovs_out.nil? "Flow added with success" else ovs_out end
+    message = if ovs_out.nil? then "Flow added with success" else ovs_out end
     message
   end
 
@@ -74,7 +74,7 @@ module OmfRc::Util::OVS
   work :handle_del_flow_ovs_configuration do |res, flow|
     ovs_out = res.ssh_command(res.property.user, res.property.ip_address, res.property.port, res.property.key_file,
                               "#{res.property.ovs_bin_dir}/ovs-ofctl del-flows #{res.property.bridge} #{flow}")
-    message = if ovs_out.nil? "Flow removed with success" else ovs_out end
+    message = if ovs_out.nil? then "Flow removed with success" else ovs_out end
     message
   end
 

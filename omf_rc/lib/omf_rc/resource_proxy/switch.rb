@@ -21,6 +21,8 @@ module OmfRc::ResourceProxy::Switch
   property :port, :default => 22
   property :user, :default => "root"
   property :key_file, :default => "/root/.ssh/id_rsa"
+  property :ovs_bin_dir, :default => "/usr/bin"
+  property :bridge, :default => "ovs-br"
 
   hook :before_ready do |switch|
     available_switches = ["ovs"]
@@ -29,7 +31,7 @@ module OmfRc::ResourceProxy::Switch
   end
 
   # Repass configuration to utilities works
-  %w(controller).each do |p|
+  %w(controller add_flow del_flow).each do |p|
     configure p do |switch, value|
       switch.__send__("handle_#{p}_#{switch.property.stype}_configuration", value)
     end

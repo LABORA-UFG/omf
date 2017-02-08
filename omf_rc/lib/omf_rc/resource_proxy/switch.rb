@@ -14,7 +14,7 @@ module OmfRc::ResourceProxy::Switch
 
   register_proxy :switch, :create_by => :switch_factory
 
-  utility :pica8
+  utility :ovs
 
   property :stype, :default => "ovs"
   property :ip_address, :default => "127.0.0.1"
@@ -23,7 +23,7 @@ module OmfRc::ResourceProxy::Switch
   property :key_file, :default => "/root/.ssh/id_rsa"
 
   hook :before_ready do |switch|
-    available_switches = ["ovs", "pica8"]
+    available_switches = ["ovs"]
     raise StandardError, "Switch type '#{switch.property.stype}' not available" unless
         available_switches.include?(switch.property.stype)
   end

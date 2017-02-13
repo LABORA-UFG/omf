@@ -21,9 +21,7 @@ module OmfRc::Util::OVS
   # @!macro group_work
   #
   # Gets ovs controller
-  #
   # @example return value
-  #
   #   tcp:127.0.0.1:3000
   #
   # @return [String]
@@ -35,6 +33,21 @@ module OmfRc::Util::OVS
                               "#{res.property.ovs_bin_dir}/ovs-vsctl get-controller #{res.property.bridge}")
     ovs_out = ovs_out.delete("\n")
     ovs_out
+  end
+
+  #
+  # Gets ovs flows
+  #
+  # @return [Array] containing all dumped ovs flows
+  #
+  # @!method handle_dump_flows_ovs_request
+  # @!macro work
+  work :handle_dump_flows_ovs_request do |res|
+    ovs_out = res.ssh_command(res.property.user, res.property.ip_address, res.property.port, res.property.key_file,
+                              "#{res.property.ovs_bin_dir}/ovs-ofctl dump-flows #{res.property.bridge}")
+    flows = ovs_out.chomp.split("\n")
+    flows.delete_at(flows.length-1)
+    flows
   end
 
   #
@@ -53,7 +66,7 @@ module OmfRc::Util::OVS
   #
   # Add a flow to ovs
   #
-  # @return [String] ovs controller
+  # @return [String] configure status
   #
   # @!method handle_add_flow_ovs_configuration(value)
   # @!macro work
@@ -67,9 +80,9 @@ module OmfRc::Util::OVS
   #
   # Delete a flow on ovs
   #
-  # @return [Boolean] true
+  # @return [String] configure status
   #
-  # @!method handle_add_flow_ovs_configuration(value)
+  # @!method handle_del_flow_ovs_configuration(value)
   # @!macro work
   work :handle_del_flow_ovs_configuration do |res, flow|
     ovs_out = res.ssh_command(res.property.user, res.property.ip_address, res.property.port, res.property.key_file,
@@ -77,7 +90,6 @@ module OmfRc::Util::OVS
     message = if ovs_out.empty? then "Flow removed with success" else ovs_out end
     message
   end
-
 
   # @!endgroup
 end

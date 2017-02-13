@@ -1,9 +1,11 @@
 # Copyright (c) 2016 Computer Networks and Distributed Systems LABORAtory (LABORA).
-# This proxy represents physical/virtual switch openflow, and it is the proxy which standard RC start up script initialised.
+# This proxy represents physical/virtual switch openflow, and it is the proxy which standard RC start up script
+# initialised.
 #
-# Switch proxy is more like a monitor/configurator proxy which monitors resource information on the switch itself, it is usually created during the bootstrap process and provides an entry point for incoming FRCP messages.
+# Switch proxy is more like a monitor/configurator proxy which monitors resource information on the switch itself,
+# it is usually created during the bootstrap process and provides an entry point for incoming FRCP messages.
 #
-# @example Setting up controller on existing switch openflow uding comunicator
+# @example Setting up controller on existing switch openflow using communicator
 #   comm.subscribe('switch01') do |switch|
 #     switch.configure(controller: 'tcp:127.0.0.1:6633')
 #   end
@@ -12,7 +14,7 @@ module OmfRc::ResourceProxy::Switch
   include OmfRc::ResourceProxyDSL
   # @!macro extend_dsl
 
-  register_proxy :switch, :create_by => :switch_factory
+  register_proxy :switch
 
   utility :ovs
 
@@ -38,7 +40,7 @@ module OmfRc::ResourceProxy::Switch
   end
 
   # Repass requests to utilities works
-  %w(controller).each do |p|
+  %w(controller dump_flows).each do |p|
     request p do |switch|
       switch.__send__("handle_#{p}_#{switch.property.stype}_request")
     end

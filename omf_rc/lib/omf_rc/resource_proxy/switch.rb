@@ -33,8 +33,9 @@ module OmfRc::ResourceProxy::Switch
   end
 
   # Repass configuration to utilities works
-  %w(controller add_flow del_flow).each do |p|
+  %w(controller add_flows del_flows).each do |p|
     configure p do |switch, value|
+      info "Configure :#{p} to switch of type #{switch.property.stype} received"
       switch.__send__("handle_#{p}_#{switch.property.stype}_configuration", value)
     end
   end
@@ -42,6 +43,7 @@ module OmfRc::ResourceProxy::Switch
   # Repass requests to utilities works
   %w(controller dump_flows).each do |p|
     request p do |switch|
+      info "Request :#{p} to switch of type #{switch.property.stype} received"
       switch.__send__("handle_#{p}_#{switch.property.stype}_request")
     end
   end

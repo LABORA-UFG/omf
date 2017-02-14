@@ -7,7 +7,7 @@ require 'hashie'
 require 'cocaine'
 
 # Utility for executing 'ovs' commands
-module OmfRc::Util::OVS
+module OmfRc::Util::Ovs
   include OmfRc::ResourceProxyDSL
 
   include Cocaine
@@ -46,7 +46,7 @@ module OmfRc::Util::OVS
     ovs_out = res.ssh_command(res.property.user, res.property.ip_address, res.property.port, res.property.key_file,
                               "#{res.property.ovs_bin_dir}/ovs-ofctl dump-flows #{res.property.bridge}")
     flows = ovs_out.chomp.split("\n")
-    flows.delete_at(flows.length-1)
+    flows.delete_at(0)
     flows
   end
 
@@ -68,13 +68,37 @@ module OmfRc::Util::OVS
   #
   # @return [String] configure status
   #
-  # @!method handle_add_flow_ovs_configuration(value)
+  # @!method handle_add_flows_ovs_configuration(value)
   # @!macro work
-  work :handle_add_flow_ovs_configuration do |res, flow|
+  work :handle_add_flows_ovs_configuration do |res, flows|
+    flows_count = 1
+    flows_added = 0
+    if flows.kind_of?(::Array)
+      flows_count = flows.length
+      flows.each do |flow|
+        if res.add_flow_ovs(flow)
+          flows_added += 1
+        end
+      end
+    else
+      if res.add_flow_ovs(flows)
+        flows_added = 1
+      end
+    end
+
+    message = if flows_added == flows_count then "Flows successfully added" else "#{flows_added} of #{flows_count} " +
+        'added' end
+    message
+  end
+
+  #
+  # Perform addition of a single flow into OVS
+  #
+  work :add_flow_ovs do |res, flow|
     ovs_out = res.ssh_command(res.property.user, res.property.ip_address, res.property.port, res.property.key_file,
                               "#{res.property.ovs_bin_dir}/ovs-ofctl add-flow #{res.property.bridge} #{flow}")
-    message = if ovs_out.empty? then "Flow added with success" else ovs_out end
-    message
+    added = if ovs_out.empty? then true else false end
+    added
   end
 
   #
@@ -82,13 +106,37 @@ module OmfRc::Util::OVS
   #
   # @return [String] configure status
   #
-  # @!method handle_del_flow_ovs_configuration(value)
+  # @!method handle_del_flows_ovs_configuration(value)
   # @!macro work
-  work :handle_del_flow_ovs_configuration do |res, flow|
+  work :handle_del_flows_ovs_configuration do |res, flows|
+    flows_count = 1
+    flows_removed = 0
+    if flows.kind_of?(::Array)
+      flows_count = flows.length
+      flows.each do |flow|
+        if res.del_flow_ovs(flow)
+          flows_removed += 1
+        end
+      end
+    else
+      if res.del_flow_ovs(flows)
+        flows_removed = 1
+      end
+    end
+
+    message = if flows_removed == flows_count then "Flows successfully removed" else "#{flows_removed} of " +
+        "#{flows_count} removed" end
+    message
+  end
+
+  #
+  # Perform removal of a single flow from OVS
+  #
+  work :del_flow_ovs do |res, flow|
     ovs_out = res.ssh_command(res.property.user, res.property.ip_address, res.property.port, res.property.key_file,
                               "#{res.property.ovs_bin_dir}/ovs-ofctl del-flows #{res.property.bridge} #{flow}")
-    message = if ovs_out.empty? then "Flow removed with success" else ovs_out end
-    message
+    removed = if ovs_out.empty? then true else false end
+    removed
   end
 
   # @!endgroup

@@ -1,4 +1,4 @@
-HOST_TOPIC_NAME = 'vm-fibre-host'
+HOST_TOPIC = 'vm-fibre-host'
 HOST_IF_NAME = "eth1"
 
 def configure_host(host)
@@ -33,9 +33,9 @@ def configure_host(host)
 
 end
 
-OmfCommon.comm.subscribe(HOST_TOPIC_NAME) do |host|
+OmfCommon.comm.subscribe(HOST_TOPIC) do |host|
   unless host.error?
-    info "Successfully subscribed on '#{HOST_TOPIC_NAME}' topic"
+    info "Successfully subscribed on '#{HOST_TOPIC}' topic"
     configure_host(host)
   end
 

@@ -17,7 +17,7 @@ module OmfEc
     include MonitorMixin
 
     attr_accessor :name, :sliceID, :oml_uri, :js_url, :ss_url, :job_url, :job_mps, :app_definitions, :property, :cmdline_properties, :show_graph, :nodes, :assertion
-    attr_reader :groups, :sub_groups
+    attr_reader :groups, :sub_groups, :switches
 
     # MP only used for injecting metadata
     class MetaData < OML4R::MPBase
@@ -35,6 +35,7 @@ module OmfEc
       @sliceID = nil
       @state ||= Hashie::Mash.new #TODO: we need to keep history of all the events and not ovewrite them
       @groups ||= []
+      @switches ||= []
       @nodes ||= []
       @events ||= []
       @app_definitions ||= Hash.new
@@ -110,6 +111,34 @@ module OmfEc
     end
 
     alias_method :add_resource, :add_or_update_resource_state
+
+    # Ovs resource
+    #
+
+    # @param [String] name
+    def switch(name)
+      switches.find { |v| v.name == name }
+    end
+
+    # @param [Switch] ovs
+    def add_switch(switch)
+      self.synchronize do
+        raise ArgumentError, "Expect Group object, got #{switch.inspect}" unless switch.kind_of? OmfEc::Switch::SwitchDescription
+        @switches << switch unless switch(switch.name)
+      end
+    end
+
+    def all_switches?(&block)
+      !switches.empty? && switches.all? { |s| block ? block.call(s) : s }
+    end
+
+    def each_switches(&block)
+      if block
+        switches.each { |s| block.call(s) }
+      else
+        switches
+      end
+    end
 
     # Find all groups a given resource belongs to
     #
@@ -330,6 +359,7 @@ module OmfEc
             OmfEc.subscribe_and_monitor(key) do |res|
               #info "Configure '#{key}' to join '#{g.name}'"
               g.synchronize do
+                info res.address
                 g.members[key] = res.address
               end
               res.configure({ membership: g.address, res_index: OmfEc.experiment.nodes.index(key) }, { assert: OmfEc.experiment.assertion })

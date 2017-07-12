@@ -15,6 +15,7 @@ require "omf_ec/experiment"
 require "omf_ec/group"
 require "omf_ec/app_definition"
 require "omf_ec/context"
+require "omf_ec/switch"
 require "omf_ec/graph"
 require "omf_ec/prototype"
 require "omf_ec/dsl"
@@ -99,6 +100,27 @@ module OmfEc
         block.call(context_obj || topic) if block
       end
     end
+
+    # TODO: New subscribe
+    def subscribe(topic_id, context_obj = nil, &block)
+      topic = OmfCommon::Comm::Topic[topic_id]
+      if topic.nil?
+        OmfCommon.comm.subscribe(topic_id, routing_key: "o.info") do |topic|
+          if topic.error?
+            error "Failed to subscribe #{topic_id}"
+          else
+            debug "Subscribed to #{topic_id}"
+            context_obj.associate_topic(topic) if context_obj
+            block.call(context_obj || topic) if block
+            register_default_callback(topic)
+          end
+        end
+      else
+        context_obj.associate_topic(topic) if context_obj
+        block.call(context_obj || topic) if block
+      end
+    end
+
   end
 end
 

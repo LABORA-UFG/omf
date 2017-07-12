@@ -25,6 +25,12 @@ module OmfEc
               end
             end
 
+            def all_switches_up?(state)
+              all_switches? do |s|
+                s.has_topic
+              end
+            end
+
             def all_interfaces_ready?(state)
               results = []
               all_groups? do |g|
@@ -91,6 +97,16 @@ module OmfEc
 
             def_event :ALL_APPS_UP do |state|
               all_nodes_up?(state) && all_apps_ready?(state)
+            end
+
+            def_event :ALL_SWITCHES_UP do |state|
+              all_switches_up?(state)
+            end
+
+            on_event :ALL_SWITCHES_UP do
+              all_switches? do |s|
+                s.configure
+              end
             end
 
             alias_event :ALL_UP_AND_INSTALLED, :ALL_APPS_UP

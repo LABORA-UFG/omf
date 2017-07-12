@@ -75,6 +75,26 @@ module OmfEc
       block.call(app_def) if block
     end
 
+    # Define a switch, create a pubsub topic for the switch
+    #
+
+    def def_switch(name, topic_name, &block)
+      switch = OmfEc::Switch::SwitchDescription.new(name, topic_name)
+      OmfEc.experiment.add_switch(switch)
+      block.call(switch) if block
+    end
+
+    # Get a switch instance
+    #
+    # @param [String] name name of the switch
+    def switch(name, &block)
+      switch = OmfEc.experiment.switch(name)
+      raise RuntimeError, "Group #{name} not found" if switch.nil?
+
+      block.call(switch) if block
+      switch
+    end
+
     # Define a group, create a pubsub topic for the group
     #
     # @param [String] name name of the group
@@ -125,6 +145,14 @@ module OmfEc
 
     def all_groups?(&block)
       OmfEc.experiment.all_groups?(&block)
+    end
+
+    def all_switches(&block)
+      OmfEc.experiment.each_switches(&block)
+    end
+
+    def all_switches?(&block)
+      OmfEc.experiment.all_switches?(&block)
     end
 
     alias_method :all_nodes!, :all_groups

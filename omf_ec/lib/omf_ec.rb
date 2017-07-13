@@ -102,7 +102,7 @@ module OmfEc
     end
 
     # TODO: New subscribe
-    def subscribe(topic_id, context_obj = nil, &block)
+    def subscribe_topic(topic_id, context_obj = nil, &block)
       topic = OmfCommon::Comm::Topic[topic_id]
       if topic.nil?
         OmfCommon.comm.subscribe(topic_id, routing_key: "o.info") do |topic|

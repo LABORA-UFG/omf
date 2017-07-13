@@ -105,7 +105,7 @@ module OmfEc
 
             on_event :ALL_SWITCHES_UP do
               all_switches? do |s|
-                s.configure
+                s.configure_params
               end
             end
 

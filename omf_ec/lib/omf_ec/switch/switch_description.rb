@@ -1,4 +1,4 @@
-# Copyright (c) 2012 National ICT Australia Limited (NICTA).
+# Copyright (c) 2017 Computer Networks and Distributed Systems LABORAtory (Labora) - [https://labora.inf.ufg.br/].
 # This software may be used and distributed solely under the terms of the MIT license (License).
 # You should find a copy of the License in LICENSE.TXT or at http://opensource.org/licenses/MIT.
 # By downloading or using this software you accept the terms and the liability disclaimer in the License.
@@ -15,7 +15,7 @@ module OmfEc::Switch
     attr_reader :topic
 
     # @param [String] name name of the group
-    # @param [Hash] opts
+    # @param [String] topic_name name of the topic
     def initialize(name, topic_name, &block)
       super()
       self.name = name
@@ -23,58 +23,90 @@ module OmfEc::Switch
       self.id = "#{OmfEc.experiment.id}.#{self.name}"
       self.params = {}
 
-      OmfEc.subscribe(topic_name, self, &block)
+      OmfEc.subscribe_topic(topic_name, self, &block)
     end
 
+    # Associate the topic reference when the subscription is received from OmfEc::subscribe_topic
+    # @param [Object] topic
     def associate_topic(topic)
       self.synchronize do
         @topic = topic
       end
     end
 
+    # Verify if has a topic associated with this class.
     def has_topic
       !@topic.nil?
     end
 
-    def configure
+    # Configure the parameters defined in defSwitch.
+    #
+    # @example
+    #   # Creating a switch with controller.
+    #   defSwitch('ovs', 'vm-fibre-ovs') do |ovs|
+    #     ovs.controller = ["tcp:192.168.0.100:6633"]
+    #   end
+    def configure_params
       self.params.each do |key, value|
         send_message(key, value, :configure)
       end
     end
 
-    #add_flows: ["in_port=1,action=output:2", "in_port=2,action=output:1"]
+    # Adding flows in switch
+    #
+    # @param [Array] flows to be added
+    #
+    # @example
+    #   # Adding flows in a ovs switch
+    #   switch('ovs').addFlows(["in_port=1,action=output:2", "in_port=2,action=output:1"])
+    #
     def addFlows(flows)
-      raise("This functions need to be executed after ALL_UP event") unless self.has_topic
-      @topic.configure(add_flows: flows) do | msg |
+      raise("This function need to be executed after ALL_SWITCHES_UP event") unless self.has_topic
+      @topic.configure(add_flows: flows) do |msg|
         if msg.success?
-          info msg[:add_flows]
+          info "Flows added with success: #{msg[:add_flows]}"
         else
           info "Could not add flows: #{msg[:add_flows]}"
         end
       end
     end
 
+    # Removing the flows installed in switch. It is only necessary the "match" part of a flow to identify it.
+    #
+    # @param [Array] flows to be removed
+    #
+    # @example
+    #   # Removing flows of a ovs switch
+    #   switch('ovs').delFlows(["in_port=1", "in_port=2"])
+    #
     def delFlows(flows)
-      raise("This functions need to be executed after ALL_UP event") unless self.has_topic
+      raise("This function need to be executed after ALL_SWITCHES_UP event") unless self.has_topic
       @topic.configure(del_flows: flows) do | msg |
         if msg.success?
-          info msg[:del_flows]
+          info "Flows removed with success: #{msg[:del_flows]}"
         else
           info "Could not remove flows: #{msg[:del_flows]}"
         end
       end
     end
 
-    def dumpFlows(flows)
-      raise("This functions need to be executed after ALL_UP event") unless self.has_topic
+    # Get all flows installed in switch.
+    #
+    # @return [Object] all flows installed in switch
+    #
+    # @example
+    #   # Get all flows installed in ovs switch
+    #   switch('ovs').dumpFlows.each do |flow|
+    #     info "Openflow Flow: #{flow}"
+    #   end
+    #
+    def dumpFlows
+      raise("This function need to be executed after ALL_SWITCHES_UP event") unless self.has_topic
       @topic.request([:dump_flows]) do |msg|
         unless msg.success?
           error "Could not get openflow flows at this time"
         end
-
-        msg[:dump_flows].each do |flow|
-          info "- Openflow Flow: #{flow}"
-        end
+        msg[:dump_flows]
       end
     end
 
@@ -82,10 +114,10 @@ module OmfEc::Switch
     #
     # @example OEDL
     #   # Will send FRCP CONFIGURE message
-    #   s.configure = 0
+    #   ovs.controller = ["tcp:192.168.0.100:6633"]
     #
     #   # Will send FRCP REQUEST message
-    #   s.configure
+    #   ovs.controller
     #
     def method_missing(name, *args, &block)
       # info name
@@ -107,18 +139,16 @@ module OmfEc::Switch
     #
     # @param [String] name of the property
     # @param [Object] value of the property, for configuring
-    # @param [Object] operation
+    # @param [Object] operation to be send, :configure or :request
     def send_message(name, value = nil, operation = :request, &block)
       case operation
-      when :configure
-        info name
-        info value
-        @topic.configure({ name => value }, {assert: OmfEc.experiment.assertion })
-        when :request
-          @topic.request([name], { assert: OmfEc.experiment.assertion })
-        else
-          # type code here
-      end
+        when :configure
+          @topic.configure({ name => value }, {assert: OmfEc.experiment.assertion })
+          when :request
+            @topic.request([name], { assert: OmfEc.experiment.assertion })
+          else
+            # type code here
+        end
     end
 
   end

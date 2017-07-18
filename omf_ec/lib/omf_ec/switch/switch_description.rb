@@ -61,7 +61,7 @@ module OmfEc::Switch
     #   switch('ovs').addFlows(["in_port=1,action=output:2", "in_port=2,action=output:1"])
     #
     def addFlows(flows)
-      raise("This function need to be executed after ALL_SWITCHES_UP event") unless self.has_topic
+      raise('This function need to be executed after ALL_SWITCHES_UP event') unless self.has_topic
       @topic.configure(add_flows: flows) do |msg|
         if msg.success?
           info "Flows added with success: #{msg[:add_flows]}"
@@ -80,8 +80,8 @@ module OmfEc::Switch
     #   switch('ovs').delFlows(["in_port=1", "in_port=2"])
     #
     def delFlows(flows)
-      raise("This function need to be executed after ALL_SWITCHES_UP event") unless self.has_topic
-      @topic.configure(del_flows: flows) do | msg |
+      raise('This function need to be executed after ALL_SWITCHES_UP event') unless self.has_topic
+      @topic.configure(del_flows: flows) do |msg|
         if msg.success?
           info "Flows removed with success: #{msg[:del_flows]}"
         else
@@ -100,13 +100,12 @@ module OmfEc::Switch
     #     info "Openflow Flow: #{flow}"
     #   end
     #
-    def dumpFlows
-      raise("This function need to be executed after ALL_SWITCHES_UP event") unless self.has_topic
+    def getFlows(&block)
+      raise('This function need to be executed after ALL_SWITCHES_UP event.') unless self.has_topic
       @topic.request([:dump_flows]) do |msg|
-        unless msg.success?
-          error "Could not get openflow flows at this time"
-        end
-        msg[:dump_flows]
+        error 'Could not get openflow flows at this time.' unless msg.success?
+        block.call(msg[:dump_flows]) if block
+        raise('To get the OpenFlow flows insert the block in code to receive the data.') unless block
       end
     end
 
@@ -120,7 +119,6 @@ module OmfEc::Switch
     #   ovs.controller
     #
     def method_missing(name, *args, &block)
-      # info name
       if name =~ /(.+)=/
         operation = :configure
         name = $1
@@ -128,9 +126,11 @@ module OmfEc::Switch
       else
         operation = :request
       end
+
       if self.has_topic
         send_message(name, *args, operation, &block)
       elsif operation == :request
+        error "Operation :request of #{name} is not allowed in this moment."
         return nil
       end
     end
@@ -141,13 +141,18 @@ module OmfEc::Switch
     # @param [Object] value of the property, for configuring
     # @param [Object] operation to be send, :configure or :request
     def send_message(name, value = nil, operation = :request, &block)
+      topic = self.topic
       case operation
         when :configure
-          @topic.configure({ name => value }, {assert: OmfEc.experiment.assertion })
-          when :request
-            @topic.request([name], { assert: OmfEc.experiment.assertion })
-          else
-            # type code here
+          topic.configure({ name => value }, {assert: OmfEc.experiment.assertion })
+        when :request
+          topic.request([name], {assert: OmfEc.experiment.assertion }) do |msg|
+            error "Could not get #{name} at this time." unless msg.success?
+            block.call(msg[name]) if block
+          end
+        else
+          info "Operation not informed."
+          # type code here
         end
     end
 

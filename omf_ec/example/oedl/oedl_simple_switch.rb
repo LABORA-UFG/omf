@@ -6,24 +6,32 @@
 SWITCH_TOPIC = 'vm-fibre-ovs'
 
 defSwitch('ovs', SWITCH_TOPIC) do |ovs|
-  ovs.controller = ['tcp:127.0.0.1:6633']
+  ovs.controller = "tcp:127.0.0.1:6633" # or ["tcp:127.0.0.1:6633", "tcp:192.168.0.100:6633"]
 end
 
 onEvent(:ALL_SWITCHES_UP) do |event|
   info "Successfully subscribed on '#{SWITCH_TOPIC}' topic"
 
-  switch('ovs').addFlows(flows: ["in_port=1,action=output:2", "in_port=2,action=output:1"])
+  # Get the controller of the switch
+  switch('ovs').controller do |controller|
+    info "- OVS Controller: #{controller}"
+  end
+
+  # Add flows
+  switch('ovs').addFlows(["in_port=1,action=output:2", "in_port=2,action=output:1"])
 
   info "Waiting 30 seconds until flows removal..."
   after(30) {
     info "Removing openflow flows..."
-    switch('ovs').delFlows(["in_port=1"])
+    switch('ovs').delFlows(["in_port=1", "in_port=2"])
   }
 
   every(5) {
     info "Requesting openflow flows..."
-    switch('ovs').dumpFlows.each do |flow|
-      info "- Openflow Flow: #{flow}"
+    switch('ovs').getFlows do |flows|
+      flows.each do |flow|
+        info "-- Openflow Flow: #{flow}"
+      end
     end
   }
 

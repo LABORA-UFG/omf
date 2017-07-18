@@ -6,7 +6,7 @@
 SWITCH_TOPIC = 'vm-fibre-ovs'
 
 defSwitch('ovs', SWITCH_TOPIC) do |ovs|
-  ovs.controller = "tcp:127.0.0.1:6633" # or ["tcp:127.0.0.1:6633", "tcp:192.168.0.100:6633"]
+  ovs.controller = "tcp:127.0.0.1:6633"
 end
 
 onEvent(:ALL_SWITCHES_UP) do |event|

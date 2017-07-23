@@ -123,7 +123,9 @@ module OmfEc
     # @param [Switch] ovs
     def add_switch(switch)
       self.synchronize do
-        raise ArgumentError, "Expect Group object, got #{switch.inspect}" unless switch.kind_of? OmfEc::Switch::SwitchDescription
+        unless switch.kind_of? OmfEc::Switch::SwitchDescription
+          raise ArgumentError, "Expect Switch object, got #{switch.inspect}"
+        end
         @switches << switch unless switch(switch.name)
       end
     end

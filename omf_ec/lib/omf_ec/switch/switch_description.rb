@@ -11,7 +11,7 @@ module OmfEc::Switch
   class SwitchDescription
     include MonitorMixin
 
-    attr_accessor :id, :name, :params, :topic_name
+    attr_accessor :id, :name, :params, :topic_name, :flows
     attr_reader :topic
 
     # @param [String] name name of the group
@@ -22,6 +22,7 @@ module OmfEc::Switch
       self.topic_name = topic_name
       self.id = "#{OmfEc.experiment.id}.#{self.name}"
       self.params = {}
+      self.flows = {}
 
       OmfEc.subscribe_topic(topic_name, self, &block)
     end
@@ -60,32 +61,13 @@ module OmfEc::Switch
     #   # Adding flows in a ovs switch
     #   switch('ovs').addFlows(["in_port=1,action=output:2", "in_port=2,action=output:1"])
     #
-    def addFlows(flows)
+    def add_flows(flows)
       raise('This function need to be executed after ALL_SWITCHES_UP event') unless self.has_topic
       @topic.configure(add_flows: flows) do |msg|
         if msg.success?
           info "Flows added with success: #{msg[:add_flows]}"
         else
           info "Could not add flows: #{msg[:add_flows]}"
-        end
-      end
-    end
-
-    # Removing the flows installed in switch. It is only necessary the "match" part of a flow to identify it.
-    #
-    # @param [Array] flows to be removed
-    #
-    # @example
-    #   # Removing flows of a ovs switch
-    #   switch('ovs').delFlows(["in_port=1", "in_port=2"])
-    #
-    def delFlows(flows)
-      raise('This function need to be executed after ALL_SWITCHES_UP event') unless self.has_topic
-      @topic.configure(del_flows: flows) do |msg|
-        if msg.success?
-          info "Flows removed with success: #{msg[:del_flows]}"
-        else
-          info "Could not remove flows: #{msg[:del_flows]}"
         end
       end
     end
@@ -154,6 +136,53 @@ module OmfEc::Switch
           info "Operation not informed."
           # type code here
         end
+    end
+
+    def addFlow(name)
+      flow = Omf::Switch::Flow.new(name)
+      self.flows << flow
+      flow
+    end
+
+    def installFlows
+      flows_s = self.flows.map {|flow| flow.flow_s}
+      self.addFlows(flows_s)
+    end
+
+    def delFlows()
+      flows_s = self.flows.map {|flow| flow.match_s}
+      self.del_flows(flows_s)
+    end
+
+    def delFlow(name)
+      flow = get_flow_by_name(name)
+      # error ""
+      self.del_flows(Array.new(flow.match_s)) if flow
+    end
+
+    # Removing the flows installed in switch. It is only necessary the "match" part of a flow to identify it.
+    #
+    # @param [Array] flows to be removed
+    #
+    # @example
+    #   # Removing flows of a ovs switch
+    #   switch('ovs').delFlows(["in_port=1", "in_port=2"])
+    #
+    def del_flows(flows)
+      raise('This function need to be executed after ALL_SWITCHES_UP event') unless self.has_topic
+      @topic.configure(del_flows: flows) do |msg|
+        if msg.success?
+          info "Flows removed with success: #{msg[:del_flows]}"
+        else
+          info "Could not remove flows: #{msg[:del_flows]}"
+        end
+      end
+    end
+
+    def get_flow_by_name(name)
+      self.flows.each do |flow|
+        return flow if flow.name == name
+      end
     end
 
   end

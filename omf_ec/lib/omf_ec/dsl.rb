@@ -75,9 +75,8 @@ module OmfEc
       block.call(app_def) if block
     end
 
-    # Define a switch, create a pubsub topic for the switch
+    # Define a switch, create a pubsub topic for the switch.
     #
-
     def def_switch(name, topic_name, &block)
       switch = OmfEc::Switch::SwitchDescription.new(name, topic_name)
       OmfEc.experiment.add_switch(switch)
@@ -279,7 +278,7 @@ module OmfEc
     # If an optional has of key/value is provided, then define an OMF
     # Experiment Property for each keys and assigne them the values.
     #
-    # @param uri URI for the OEDL script to load
+    # @param location URI for the OEDL script to load
     # @param opts optional hash of key/values for extra Experiment Property to define
     #
     def load_oedl(location, opts = {})

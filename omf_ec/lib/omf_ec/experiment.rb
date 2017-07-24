@@ -120,7 +120,7 @@ module OmfEc
       switches.find { |v| v.name == name }
     end
 
-    # @param [Switch] ovs
+    # @param [SwitchDescription] ovs
     def add_switch(switch)
       self.synchronize do
         unless switch.kind_of? OmfEc::Switch::SwitchDescription

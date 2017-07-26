@@ -30,13 +30,33 @@
 # Utility dependencies: common_tools
 #
 # This VM Factory Proxy is the resource entity that can create VM Proxies.
-# @see OmfRc::ResourceProxy::Hypervisor
+# @see OmfRc::ResourceProxy::VirtualMachine
 #
-module OmfRc::ResourceProxy::HypervisorFactory
+module OmfRc::ResourceProxy::Hipervisor
   include OmfRc::ResourceProxyDSL 
 
-  register_proxy :hypervisor_factory
+  register_proxy :hypervisor
   utility :common_tools
+
+  # Default VirtualMachine to use
+  HYPERVISOR_DEFAULT = :kvm
+  # Default URI for the default VirtualMachine
+  HYPERVISOR_URI_DEFAULT = 'qemu:///system'
+  # Default virtualisation management tool to use
+  VIRTUAL_MNGT_DEFAULT = :libvirt
+  # Default VM image building tool to use
+  IMAGE_BUILDER_DEFAULT = :virt_install
+  # Default directory to store the VM's disk image
+  VM_DIR_DEFAULT = "/home/thierry/experiments/omf6-dev/images"
+
+  property :use_sudo, :default => true
+  property :hypervisor, :default => HYPERVISOR_DEFAULT
+  property :hypervisor_uri, :default => HYPERVISOR_URI_DEFAULT
+  property :virt_mngt, :default => VIRTUAL_MNGT_DEFAULT
+  property :img_builder, :default => IMAGE_BUILDER_DEFAULT
+  property :enable_omf, :default => true
+  property :image_directory, :default => VM_DIR_DEFAULT
+  property :image_path, :default => VM_DIR_DEFAULT
 
   hook :before_ready do |res|
     res.property.vms_path ||= "/var/lib/libvirt/images/"
@@ -44,7 +64,7 @@ module OmfRc::ResourceProxy::HypervisorFactory
   end
 
   hook :before_create do |res, type, opts = nil|
-    if type.to_sym != :hypervisor_rc
+    if type.to_sym != :virtual_machine
       raise "This resource only creates VM! (Cannot create a resource: #{type})"
     end
   end

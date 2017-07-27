@@ -60,9 +60,13 @@ module OmfRc::Util::Fibre
     params = {}
     params[:vm_name]= res.property.vm_name
 
+    # Add virt-install options
     res.property.vm_opts.each do |k, v|
       if k == "bridges"
         params[:bridges] = v
+        # v.each do |bridge_name|
+        #   params[:bridges].push(bridge_name)
+        # end
       elsif k == "disk"
         image_name = "#{res.property.image_final_path}/#{v.image}_#{res.property.vm_name}_#{Time.now.to_i}.img"
         params[:disk] = image_name
@@ -77,6 +81,8 @@ module OmfRc::Util::Fibre
     renderer = ERB.new(template, 0, "%<>")
     domain_xml = renderer.result(binding)
 
+    logger.info domain_xml
+
     domain_file = File.join(File.dirname(File.expand_path(__FILE__)), "domain_#{res.property.vm_name}_#{Time.now.to_i}.erb")
     File.write(domain_file, domain_xml)
 
@@ -88,29 +94,51 @@ module OmfRc::Util::Fibre
     start_result = res.run_vm_with_libvirt
 
     File.delete(domain_file)
+    result = start_result
 
-    res.log_inform_error "Error in VM #{params[:vm_name]} creation" if start_result.include? "error"
-    # result = `#{cmd} 2>&1`
-    # if $?.exitstatus != 0
-    #   res.log_inform_error "Cannot build VM image: '#{result}'"
-    #   false
-    # else
-    #   logger.info "VM image built successfully!"
-    #   vm_topic = res.get_mac_addr(res.property.vm_name)
-    #   logger.info "The topic to access the VM is: #{vm_topic}"
-    #   vm_topic
-    # end
+    if start_result.include? "error:"
+      res.log_inform_error "Error in VM #{params[:vm_name]} creation" if start_result.include? "error:"
+    else
+      logger.info "VM image built successfully!"
+      vm_topic = res.get_mac_addr(res.property.vm_name)
+      logger.info "The topic to access the VM is: #{vm_topic}"
+      result = vm_topic
+    end
+
+    result
   end
 
   work :create_template_copy do |res, template_image, image_name|
-    cmd = "rsync -ah --progress #{res.property.image_template_path}/#{template_image} " +
-        "#{image_name}"
+    template_img_fullname = "#{res.property.image_template_path}/#{template_image}"
+    user = res.property.ssh_params.user
+    ip_address = res.property.ssh_params.ip_address
+    port = res.property.ssh_params.port
+    key_file = res.property.ssh_params.key_file
+
     logger.info "Creating VM image..."
-    output = res.ssh_command(res.property.ssh_params.user, res.property.ssh_params.ip_address,
-                             res.property.ssh_params.port, res.property.ssh_params.key_file,
-                             cmd)
-    output = output.delete("\n")
-    output
+
+    Thread.new {
+      cmd = "cp #{template_img_fullname} #{image_name}"
+      res.ssh_command(user, ip_address, port, key_file, cmd)
+    }
+
+    cmd = "ssh -l #{user} #{ip_address} -p #{port} -i #{key_file} du #{template_img_fullname}"
+
+    template_size = `#{cmd}`
+    template_size = template_size.split(" ")[0].to_i
+
+    progress = 0
+
+    while progress != 100.0 do
+      sleep 5
+      cmd = "ssh -l #{user} #{ip_address} -p #{port} -i #{key_file} du #{image_name}"
+      copy_size = `#{cmd}`
+      copy_size = copy_size.split(" ")[0].to_i
+      progress = (copy_size.to_f/template_size).round(2) * 100
+      res.inform(:status, {progress: "#{"%.0f" % progress}%"})
+    end
+
+    progress.to_s
   end
 
   work :get_mac_addr do |res, vm_name|

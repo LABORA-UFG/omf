@@ -15,7 +15,7 @@ options = {
 
 EM.run do
   # Use resource factory method to initialise a new instance of the resource
-  my_vm_factory = OmfRc::ResourceFactory.new(:hypervisor_factory, options)
+  my_vm_factory = OmfRc::ResourceFactory.new(:hypervisor, options)
   # Let the resource to XMPP server
   my_vm_factory.connect
 

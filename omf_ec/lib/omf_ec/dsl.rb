@@ -75,6 +75,14 @@ module OmfEc
       block.call(app_def) if block
     end
 
+    # Define a vm group, create a pubsub topic for the vm group.
+    #
+    def def_vm_group(name, topic_name, &block)
+      vm_group = OmfEc::Vm::VmGroup.new(name, topic_name)
+      OmfEc.experiment.add_vm_group(vm_group)
+      block.call(vm_group) if block
+    end
+
     # Define a switch, create a pubsub topic for the switch.
     #
     def def_switch(name, topic_name, &block)
@@ -89,9 +97,15 @@ module OmfEc
     def switch(name, &block)
       switch = OmfEc.experiment.switch(name)
       raise RuntimeError, "Group #{name} not found" if switch.nil?
-
       block.call(switch) if block
       switch
+    end
+
+    def vm_group(name, &block)
+      vm_group = OmfEc.experiment.vm_group(name)
+      raise RuntimeError, "VmGroup #{name} not found" if vm_group.nil?
+      block.call(vm_group) if block
+      vm_group
     end
 
     # Define a group, create a pubsub topic for the group
@@ -132,7 +146,6 @@ module OmfEc
     def group(name, &block)
       group = OmfEc.experiment.group(name)
       raise RuntimeError, "Group #{name} not found" if group.nil?
-
       block.call(group) if block
       group
     end
@@ -152,6 +165,14 @@ module OmfEc
 
     def all_switches?(&block)
       OmfEc.experiment.all_switches?(&block)
+    end
+
+    def all_vm_groups(&block)
+      OmfEc.experiment.each_vm_group(&block)
+    end
+
+    def all_vm_groups?(&block)
+      OmfEc.experiment.all_vm_groups?(&block)
     end
 
     alias_method :all_nodes!, :all_groups

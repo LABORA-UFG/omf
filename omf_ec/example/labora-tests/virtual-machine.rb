@@ -7,7 +7,7 @@ OmfCommon.comm.subscribe('vm-testbed') do |hypervisor|
     error app.inspect
   else
 
-    hypervisor.create(:hypervisor_rc) do |reply_msg|
+    hypervisor.create(:virtual_machine) do |reply_msg|
       puts reply_msg
       vm = reply_msg.resource
 

@@ -97,7 +97,7 @@ module OmfRc::Util::Fibre
     result = start_result
 
     if start_result.include? "error:"
-      res.log_inform_error "Error in VM #{params[:vm_name]} creation" if start_result.include? "error:"
+      res.log_inform_error "Error in VM #{params[:vm_name]} creation"
     else
       logger.info "VM image built successfully!"
       vm_topic = res.get_mac_addr(res.property.vm_name)
@@ -117,11 +117,13 @@ module OmfRc::Util::Fibre
 
     logger.info "Creating VM image..."
 
+    #Start image copying
     Thread.new {
       cmd = "cp #{template_img_fullname} #{image_name}"
       res.ssh_command(user, ip_address, port, key_file, cmd)
     }
 
+    #Get the size of the template image to calc the copy progress
     cmd = "ssh -l #{user} #{ip_address} -p #{port} -i #{key_file} du #{template_img_fullname}"
 
     template_size = `#{cmd}`
@@ -129,6 +131,7 @@ module OmfRc::Util::Fibre
 
     progress = 0
 
+    #Calculate and inform the copy progress
     while progress != 100.0 do
       sleep 5
       cmd = "ssh -l #{user} #{ip_address} -p #{port} -i #{key_file} du #{image_name}"

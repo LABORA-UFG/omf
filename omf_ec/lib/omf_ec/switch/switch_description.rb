@@ -53,44 +53,6 @@ module OmfEc::Switch
       end
     end
 
-    # Adding flows in switch
-    #
-    # @param [Array] flows to be added
-    #
-    # @example
-    #   # Adding flows in a ovs switch
-    #   switch('ovs').addFlows(["in_port=1,action=output:2", "in_port=2,action=output:1"])
-    #
-    def add_flows(flows)
-      raise('This function need to be executed after ALL_SWITCHES_UP event') unless self.has_topic
-      @topic.configure(add_flows: flows) do |msg|
-        if msg.success?
-          info "Flows added with success: #{msg[:add_flows]}"
-        else
-          info "Could not add flows: #{msg[:add_flows]}"
-        end
-      end
-    end
-
-    # Get all flows installed in switch.
-    #
-    # @return [Object] all flows installed in switch
-    #
-    # @example
-    #   # Get all flows installed in ovs switch
-    #   switch('ovs').dumpFlows.each do |flow|
-    #     info "Openflow Flow: #{flow}"
-    #   end
-    #
-    def getFlows(&block)
-      raise('This function need to be executed after ALL_SWITCHES_UP event.') unless self.has_topic
-      @topic.request([:dump_flows]) do |msg|
-        error 'Could not get openflow flows at this time.' unless msg.success?
-        block.call(msg[:dump_flows]) if block
-        raise('To get the OpenFlow flows insert the block in code to receive the data.') unless block
-      end
-    end
-
     # Calling standard methods or assignments will simply trigger sending a FRCP message
     #
     # @example OEDL
@@ -138,26 +100,80 @@ module OmfEc::Switch
         end
     end
 
-    def addFlow(name)
-      flow = Omf::Switch::Flow.new(name)
-      self.flows << flow
-      flow
+    # To be create a flow in switch, first we need create it and after add the match and actions of flow.
+    # @param [String] name to identify the flow on the switch
+    # @param [Object] block
+    def addFlow(name, &block)
+      flow = Omf::Switch::SwitchFlow.new(name)
+      if switch_flow(name)
+        raise("Already exists a flow with name '#{name}'")
+      else
+        self.flows << flow
+        block.call(flow) if flow
+      end
     end
 
+    # Install all flows in switch
     def installFlows
       flows_s = self.flows.map {|flow| flow.flow_s}
-      self.addFlows(flows_s)
+      self.add_flows(flows_s)
     end
 
-    def delFlows()
+    # Install a flow in switch
+    def installFlow(name)
+      flow = switch_flow(name)
+      flow ? self.add_flows(Array.new(flow.flow_s)) : error "The flow with name '#{name}' not exist."
+    end
+
+    # Removes all flows from switch
+    def delFlows
       flows_s = self.flows.map {|flow| flow.match_s}
       self.del_flows(flows_s)
     end
 
+    # Removes a flow from switch
+    # @param [String] name of flow to be removed
     def delFlow(name)
-      flow = get_flow_by_name(name)
-      # error ""
-      self.del_flows(Array.new(flow.match_s)) if flow
+      flow = switch_flow(name)
+      flow ? self.del_flows(Array.new(flow.match_s)) : error "The flow with name '#{name}' not exist."
+    end
+
+    # Get all flows installed in switch.
+    #
+    # @return [Array] with all flows installed in switch
+    #
+    # @example
+    #   # Get all flows installed in ovs switch
+    #   switch('ovs').getFlows do |flows|
+    #     info "Openflow Flow: #{flow}"
+    #   end
+    #
+    def getFlows(&block)
+      raise('This function need to be executed after ALL_SWITCHES_UP event.') unless self.has_topic
+      @topic.request([:dump_flows]) do |msg|
+        error 'Could not get openflow flows at this time.' unless msg.success?
+        block.call(msg[:dump_flows]) if block
+        raise('To get the OpenFlow flows insert the block in code to receive the data.') unless block
+      end
+    end
+
+    # Adding flows in switch
+    #
+    # @param [Array] flows to be added
+    #
+    # @example
+    #   # Adding flows in a ovs switch
+    #   switch('ovs').addFlows(["in_port=1,action=output:2", "in_port=2,action=output:1"])
+    #
+    def add_flows(flows)
+      raise('This function need to be executed after ALL_SWITCHES_UP event') unless self.has_topic
+      @topic.configure(add_flows: flows) do |msg|
+        if msg.success?
+          info "Flows added with success: #{msg[:add_flows]}"
+        else
+          info "Could not add flows: #{msg[:add_flows]}"
+        end
+      end
     end
 
     # Removing the flows installed in switch. It is only necessary the "match" part of a flow to identify it.
@@ -179,10 +195,9 @@ module OmfEc::Switch
       end
     end
 
-    def get_flow_by_name(name)
-      self.flows.each do |flow|
-        return flow if flow.name == name
-      end
+    # Select the specific flow by name
+    def switch_flow(name)
+      flows.find { |f| f.name == name }
     end
 
   end

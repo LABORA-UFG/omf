@@ -234,14 +234,6 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :vm_os, :default => VM_OS_DEFAULT
   property :omf_opts, :default => OMF_DEFAULT
 
-  # Properties to run ssh command
-  property :ssh_params, :default => {
-      ip_address: "127.0.0.1",
-      port: 22,
-      user: "root",
-      key_file: "/root/.ssh/id_rsa"
-  }
-
   property :vm_opts
 
   hook :before_ready do |res|

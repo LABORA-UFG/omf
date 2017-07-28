@@ -29,12 +29,6 @@ def createVM(vm_name, vm_template)
                     disk: {
                         image: vm_template
                     }
-                },
-                ssh_params: {
-                    ip_address: "192.168.1.2",
-                    port: 22,
-                    user: "root",
-                    key_file: "/root/.ssh/id_rsa"
                 }, action: :build)
           end
 

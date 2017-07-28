@@ -21,3 +21,8 @@ resources:
   virt_install_path: /usr/bin/virt-install
   image_template_path: /root/images_templates
   image_final_path: /var/lib/libvirt/images
+  ssh_params:
+    ip_address: "192.168.1.2"
+    user: root
+    port: 22
+    key_file: "/root/.ssh/id_rsa"

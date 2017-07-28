@@ -58,6 +58,14 @@ module OmfRc::ResourceProxy::Hipervisor
   property :image_directory, :default => VM_DIR_DEFAULT
   property :image_path, :default => VM_DIR_DEFAULT
 
+  # Properties to run ssh command
+  property :ssh_params, :default => {
+      ip_address: "127.0.0.1",
+      port: 22,
+      user: "root",
+      key_file: "/root/.ssh/id_rsa"
+  }
+
   hook :before_ready do |res|
     res.property.vms_path ||= "/var/lib/libvirt/images/"
     res.property.vm_list ||= []

@@ -38,11 +38,11 @@ module OmfRc::Util::Libvirt
   VIRSH = "/usr/bin/virsh"
   VIRTCLONE = "/usr/bin/virt-clone"
 
-  work :execute_cmd do |res, cmd, intro_msg, error_msg, success_msg|
+  work :execute_cmd do |res, cmd, intro_msg, error_msg, success_msg, inform_error=true|
     logger.info "#{intro_msg} with: '#{cmd}'"
     result = `#{cmd} 2>&1`
     if $?.exitstatus != 0
-      res.log_inform_error "#{error_msg}: '#{result}'"
+      res.log_inform_error "#{error_msg}: '#{result}'" if inform_error
       result.strip
     else
       logger.info "#{success_msg}"
@@ -123,7 +123,7 @@ module OmfRc::Util::Libvirt
   work :check_vm_state_with_libvirt do |res|
     cmd = "#{VIRSH} -c #{res.property.hypervisor_uri} domstate #{res.property.vm_name}"
     result = res.execute_cmd(cmd, "Looking for VM state",
-                             "Cannot look for VM state", "VM state found!")
+                             "Cannot look for VM state", "VM state found!", false)
     result
   end
 

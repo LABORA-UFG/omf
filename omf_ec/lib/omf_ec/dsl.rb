@@ -175,6 +175,10 @@ module OmfEc
       OmfEc.experiment.all_vm_groups?(&block)
     end
 
+    def all_vms?(&block)
+      OmfEc.experiment.all_vms?(&block)
+    end
+
     alias_method :all_nodes!, :all_groups
 
     # Exit the experiment

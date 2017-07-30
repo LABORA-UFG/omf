@@ -20,7 +20,7 @@ module OmfEc::Vm
       self.id = "#{OmfEc.experiment.id}.#{self.name}"
       self.name = name
       self.topic_name = topic_name
-      self.vms ||= []
+      @vms ||= []
 
       OmfEc.subscribe_topic(topic_name, self, &block)
     end
@@ -34,6 +34,8 @@ module OmfEc::Vm
     # @param [Object] topic
     def associate_topic(topic)
       self.synchronize do
+        info "VM_GROUP - receive the topic" # TODO: remove this
+        info topic
         @topic = topic
       end
     end
@@ -43,10 +45,10 @@ module OmfEc::Vm
     def addVm(name, &block)
       self.synchronize do
         vm = OmfEc::Vm::VirtualMachine.new(name, self)
-        if vms.find {|v| v.name == name}
+        if self.vms.find {|v| v.name == name}
           error "The Vm (#{name}) already added."
         else
-          @vms << vm
+          self.vms << vm
           OmfEc.experiment.add_vm(vm)
           block.call(vm) if block
         end
@@ -56,20 +58,23 @@ module OmfEc::Vm
     # Create a new virtual machine in the hypervisor and receive the topic to manage it.
     # @return [vm_topic] topic to manage the virtual machine.
     def create_vm(&block)
-      self.synchronize do
-        self.vm_group.topic.configure(:virtual_machine) do |vm|
-          vm_topic = vm.resource
-          if vm_topic.error?
-            error app.inspect
-          else
+      raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.has_topic
+      # self.synchronize do
+      topic.create(:virtual_machine) do |vm|
+        vm_topic = vm.resource
+        if vm_topic.error?
+          error app.inspect
+        else
+          vm_topic.on_subscribed do
             block.call(vm_topic) if block
           end
         end
       end
+      # end
     end
 
     def vm(name)
-      @vms.find {|v| v.name == name}
+      self.vms.find {|v| v.name == name}
     end
 
   end

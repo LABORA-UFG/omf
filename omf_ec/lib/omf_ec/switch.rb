@@ -4,6 +4,7 @@
 # By downloading or using this software you accept the terms and the liability disclaimer in the License.
 
 require 'omf_ec/switch/switch_description'
+require 'omf_ec/switch/switch_flow'
 
 module OmfEc
   module Switch

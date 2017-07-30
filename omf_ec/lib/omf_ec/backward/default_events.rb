@@ -123,7 +123,7 @@ module OmfEc
             # Vm
             def all_vms_created?(state)
               all_vms? do |vm|
-                vm.has_vnode_topic
+                vm.has_vm_node_topic
               end
             end
 

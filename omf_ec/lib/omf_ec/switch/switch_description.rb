@@ -22,7 +22,7 @@ module OmfEc::Switch
       self.topic_name = topic_name
       self.id = "#{OmfEc.experiment.id}.#{self.name}"
       self.params = {}
-      self.flows = {}
+      self.flows = []
 
       OmfEc.subscribe_topic(topic_name, self, &block)
     end
@@ -104,7 +104,7 @@ module OmfEc::Switch
     # @param [String] name to identify the flow on the switch
     # @param [Object] block
     def addFlow(name, &block)
-      flow = Omf::Switch::SwitchFlow.new(name)
+      flow = OmfEc::Switch::SwitchFlow.new(name)
       if switch_flow(name)
         raise("Already exists a flow with name '#{name}'")
       else
@@ -122,7 +122,11 @@ module OmfEc::Switch
     # Install a flow in switch
     def installFlow(name)
       flow = switch_flow(name)
-      flow ? self.add_flows(Array.new(flow.flow_s)) : error "The flow with name '#{name}' not exist."
+      if flow then
+        self.add_flows(Array.new(flow.flow_s))
+      else
+        error "The flow with name '#{name}' not exist."
+      end
     end
 
     # Removes all flows from switch
@@ -135,7 +139,11 @@ module OmfEc::Switch
     # @param [String] name of flow to be removed
     def delFlow(name)
       flow = switch_flow(name)
-      flow ? self.del_flows(Array.new(flow.match_s)) : error "The flow with name '#{name}' not exist."
+      if flow then
+        self.del_flows(Array.new(flow.match_s))
+      else
+        error "The flow with name '#{name}' not exist."
+      end
     end
 
     # Get all flows installed in switch.

@@ -3,8 +3,9 @@
 # You should find a copy of the License in LICENSE.TXT or at http://opensource.org/licenses/MIT.
 # By downloading or using this software you accept the terms and the liability disclaimer in the License.
 
-require 'omf_ec/lib/omf_ec/vm/vm'
-require 'omf_ec/lib/omf_ec/vm/vm_group'
+require 'omf_ec/vm/vm'
+require 'omf_ec/vm/vm_group'
+require 'omf_ec/vm/vm_node'
 
 module OmfEc
   module Vm

@@ -152,7 +152,7 @@ module OmfEc
     # @param [VirtualMachine] vm
     def add_vm(vm)
       self.synchronize do
-        unless switch.kind_of? OmfEc::Vm::VirtualMachine
+        unless vm.kind_of? OmfEc::Vm::VirtualMachine
           raise ArgumentError, "Expect VirtualMachine object, got #{vm.inspect}"
         end
         @vms << vm unless @vms.find { |v| v.id == vm.id }
@@ -170,16 +170,16 @@ module OmfEc
 
     # @param [String] name
     def switch(name)
-      switches.find { |v| v.name == name }
+      @switches.find { |v| v.name == name }
     end
 
     # @param [SwitchDescription] ovs
-    def add_switch(switch)
+    def add_switch(sw)
       self.synchronize do
-        unless switch.kind_of? OmfEc::Switch::SwitchDescription
-          raise ArgumentError, "Expect Switch object, got #{switch.inspect}"
+        unless sw.kind_of? OmfEc::Switch::SwitchDescription
+          raise ArgumentError, "Expect Switch object, got #{sw.inspect}"
         end
-        @switches << switch unless switch(switch.name)
+        @switches << sw unless switch(sw.name)
       end
     end
 

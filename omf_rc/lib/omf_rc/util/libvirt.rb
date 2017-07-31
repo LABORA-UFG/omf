@@ -42,10 +42,10 @@ module OmfRc::Util::Libvirt
     logger.info "#{intro_msg} with: '#{cmd}'"
     result = `#{cmd} 2>&1`
     if $?.exitstatus != 0
-      res.log_inform_error "#{error_msg}: '#{result}'" if inform_error
+      res.log_inform_error "#{error_msg}: '#{result.strip}'" if inform_error
       result.strip
     else
-      logger.info "#{success_msg}"
+      res.inform(:status, Hashie::Mash.new({:vm_return => "#{success_msg}: #{result.strip}"}))
       result.strip
     end
   end

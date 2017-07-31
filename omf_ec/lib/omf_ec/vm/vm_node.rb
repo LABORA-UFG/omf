@@ -38,7 +38,6 @@ module OmfEc::Vm
     # @param [Object] topic
     def associate_topic(topic)
       self.synchronize do
-        info "Vm Node - receive the topic" # TODO: remove this
         @topic = topic
       end
     end

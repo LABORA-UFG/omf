@@ -89,24 +89,18 @@ module OmfEc::Vm
     def create(&block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.vm_group.has_topic
       # create the vm in hypervisor
-      info "create" # TODO
       self.recv_vm_topic do
         opts = {ram: self.ram, cpu: self.cpu, bridges: self.bridges, disk: {image: self.image}}
         # build the VM
-        info "recv_vm_topic -> create" # TODO
         @vm_topic.configure(vm_opts: opts, action: :build) do |build_msg|
-          info "topic -> create" # TODO
           if build_msg.success?
-            info "VM #{self.name} created with success" # TODO
             # wait receive the message of creation of the VM
             @vm_topic.on_message do |msg|
               if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:vm_topic]
-                info "Virtual Node topic received" # TODO
                 @vm_node.subscribe(msg.properties[:vm_topic]) do
                   # after created configure the host parameters
                   sleep(TIME_TO_VM_RUN)
                   self.configure_params
-                  info "Configuring parameters of VM: '#{self.name}'" # TODO
                   block.call if block
                 end
               end
@@ -122,11 +116,8 @@ module OmfEc::Vm
 
     #
     def run(&block)
-      info "run" # TODO
       self.recv_vm_topic do
-        info "recv_vm_topic -> run" # TODO
         @vm_topic.configure(vm_name: self.name, action: :run) do
-          info "topic -> run" # TODO
           block.call if block
         end
       end
@@ -134,11 +125,8 @@ module OmfEc::Vm
 
     #
     def stop(&block)
-      info "stop" # TODO
       self.recv_vm_topic do
-        info "recv_vm_topic -> stop" # TODO
         @vm_topic.configure(vm_name: self.name, action: :stop) do
-          info "topic -> stop" # TODO
           block.call if block
         end
       end
@@ -146,11 +134,8 @@ module OmfEc::Vm
 
     #
     def delete(&block)
-      info "delete" # TODO
       self.recv_vm_topic do
-        info "recv_vm_topic -> delete" # TODO
         @vm_topic.configure(vm_name: self.name, action: :delete) do
-          info "topic -> delete" # TODO
           block.call if block
         end
       end
@@ -159,11 +144,13 @@ module OmfEc::Vm
     #
     def clone(old, new)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.has_topic
+      warn 'This function is not implemented'
     end
 
     #
     def state
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.has_topic
+      warn 'This function is not implemented'
     end
 
     # Calling standard methods or assignments will simply trigger sending a FRCP message
@@ -171,9 +158,9 @@ module OmfEc::Vm
     def listen_messages
       raise('This function can only be executed when there is a topic') unless self.vm_topic
       @vm_topic.on_message do |msg|
-        if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:vm_topic]
-          info 'listen_messages::receive_vm_topic'
-        end
+        # if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:vm_topic]
+        #   # info 'listen_messages::receive_vm_topic'
+        # end
         if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:progress]
           info "#{@name} progress: #{msg.properties[:progress]}"
         elsif msg.itype == "ERROR" and msg.has_properties? and msg.properties[:reason]
@@ -195,25 +182,20 @@ module OmfEc::Vm
     def configure_params
       raise('This function can only be executed when there is a topic') unless self.has_vm_node_topic
       topic = @vm_node.topic
-      info "configure_params::params -> #{@params}" # TODO:: problema que os parâmetros de string estão sendo enviados como array ex: ["labora-host"]
+      # info "configure_params::params -> #{@params}" # TODO:: problema que os parâmetros de string estão sendo enviados como array ex: ["labora-host"]
       @params.each do |key, value|
-        info "configure_params::param::::#{key}, #{value}" # TODO
         topic.configure({:"#{key}" => "#{value}"}) do |vm_param|
-          info "configure_params::param: #{vm_param}" # TODO
+          debug "configure_params::param: #{vm_param}" # TODO
         end
       end
-      info "configure_params::users -> #{@users}" # TODO
       @users.each do |user|
-        info "configure_params::user::::#{user}" # TODO
         topic.configure(user: [{username: user[:username], password: user[:password]}]) do |vm_user|
-          info "configure_params::user: #{vm_user}" # TODO
+          debug "configure_params::user: #{vm_user}" # TODO
         end
       end
-      info "configure_params::vlans -> #{@vlans}" # TODO
       @vlans.each do |vlan|
-        info "configure_params::vlan::::#{value}" # TODO
         topic.configure(vlan: [{interface: vlan[:interface], vlan_id: vlan[:vlan_id]}]) do |vm_vlan|
-          info "configure_params::vlan: #{vm_vlan}" # TODO
+          debug "configure_params::vlan: #{vm_vlan}" # TODO
         end
       end
     end
@@ -232,11 +214,7 @@ module OmfEc::Vm
         operation = :configure
         name = $1
         arg = *args
-        info "method_missing::configure -> #{name}, #{arg}" # TODO
-        puts "method_missing::configure -> #{name}, #{arg}" # TODO
         if @conf_params.include?("#{name}")
-          info "method_missing::configure-2 -> #{name}, #{arg}" # TODO
-          puts "method_missing::configure-2-> #{name}, #{arg}" # TODO
           @params[name] = *args
         else
           error "method_missing::configure to #{name} is not available."
@@ -245,9 +223,7 @@ module OmfEc::Vm
       else
         operation = :request
         if @req_params.include?("#{name}")
-          info 'method_missing::request ----'
           name = "vm_#{name}".to_sym
-          info "method_missing::request -> #{name}" # TODO
         else
           error "method_missing::request to #{name} is not available."
           return nil
@@ -272,18 +248,16 @@ module OmfEc::Vm
       topic = @vm_node.topic
       case operation
         when :configure
-          info "send_message::configure -> #{name}" # TODO
           topic.configure({ name => value }, { assert: OmfEc.experiment.assertion }) do |msg|
-            info "send_message::configure::received -> #{msg}" # TODO
+            debug "send_message::configure::received -> #{msg}"
             block.call(msg) if block
           end
         when :request
-          info "send_message::request -> #{name}" # TODO
           topic.request([name], { assert: OmfEc.experiment.assertion }) do |msg|
             unless msg.success?
               error "Could not get #{name} at this time."
             end
-            info "send_message::request::receive -> #{name}" # TODO
+            debug "send_message::request::receive -> #{name}"
             block.call(msg[name]) if block
           end
         else

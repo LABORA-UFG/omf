@@ -34,8 +34,6 @@ module OmfEc::Vm
     # @param [Object] topic
     def associate_topic(topic)
       self.synchronize do
-        info "VM_GROUP - receive the topic" # TODO: remove this
-        info topic
         @topic = topic
       end
     end

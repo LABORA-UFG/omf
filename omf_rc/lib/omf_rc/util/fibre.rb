@@ -69,6 +69,7 @@ module OmfRc::Util::Fibre
         # end
       elsif k == "disk"
         image_name = "#{res.property.image_final_path}/#{v.image}_#{res.property.vm_name}_#{Time.now.to_i}.img"
+        res.property.image_name = image_name
         params[:disk] = image_name
         res.create_template_copy(v.image, image_name)
       else
@@ -108,6 +109,12 @@ module OmfRc::Util::Fibre
     result
   end
 
+  work :delete_vm_with_fibre do |res|
+    result = res.delete_vm_with_libvirt
+
+    res.remove_image(res.property.image_name)
+  end
+
   work :create_template_copy do |res, template_image, image_name|
     template_img_fullname = "#{res.property.image_template_path}/#{template_image}"
     user = res.property.ssh_params.user
@@ -142,6 +149,19 @@ module OmfRc::Util::Fibre
     end
 
     progress.to_s
+  end
+
+  work :remove_image do |res, image_name|
+    user = res.property.ssh_params.user
+    ip_address = res.property.ssh_params.ip_address
+    port = res.property.ssh_params.port
+    key_file = res.property.ssh_params.key_file
+
+    logger.info "Removing VM image..."
+
+    cmd = "rm -f #{image_name}"
+    result = res.ssh_command(user, ip_address, port, key_file, cmd)
+    result
   end
 
   work :get_mac_addr do |res, vm_name|

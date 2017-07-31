@@ -7,6 +7,14 @@ SWITCH_TOPIC = 'vm-fibre-ovs'
 
 defSwitch('ovs', SWITCH_TOPIC) do |ovs|
   ovs.controller = "tcp:127.0.0.1:6633"
+  ovs.addFlow('flow1') do |flow1|
+    flow1.match.in_port = 1
+    flow1.action.output = 2
+  end
+  ovs.addFlow('flow2') do |flow2|
+    flow2.match.in_port = 2
+    flow2.action.output = 1
+  end
 end
 
 onEvent(:ALL_SWITCHES_UP) do |event|
@@ -18,12 +26,16 @@ onEvent(:ALL_SWITCHES_UP) do |event|
   end
 
   # Add flows
-  switch('ovs').addFlows(["in_port=1,action=output:2", "in_port=2,action=output:1"])
+  # switch('ovs').installFlows
+  switch('ovs').installFlow('flow1')
+  switch('ovs').installFlow('flow2')
 
   info "Waiting 30 seconds until flows removal..."
   after(30) {
     info "Removing openflow flows..."
-    switch('ovs').delFlows(["in_port=1", "in_port=2"])
+    # switch('ovs').delFlows
+    switch('ovs').delFlow('flow1')
+    switch('ovs').delFlow('flow2')
   }
 
   every(5) {

@@ -109,6 +109,28 @@ module OmfEc
               end
             end
 
+            # VmGroup
+            def all_vm_group_up?(state)
+              all_vm_groups? do |v|
+                v.has_topic
+              end
+            end
+
+            def_event :ALL_VM_GROUPS_UP do |state|
+              all_vm_group_up?(state)
+            end
+
+            # Vm
+            def all_vms_created?(state)
+              all_vms? do |vm|
+                vm.has_vm_node_topic
+              end
+            end
+
+            def_event :ALL_VMS_CREATED do |state|
+              all_vms_created?(state)
+            end
+
             alias_event :ALL_UP_AND_INSTALLED, :ALL_APPS_UP
 
             def_event :ALL_APPS_DONE do |state|

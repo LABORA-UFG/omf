@@ -16,8 +16,8 @@ module OmfEc
 
     include MonitorMixin
 
-    attr_accessor :name, :sliceID, :oml_uri, :js_url, :ss_url, :job_url, :job_mps, :app_definitions, :property, :cmdline_properties, :show_graph, :nodes, :assertion
-    attr_reader :groups, :sub_groups, :switches
+    attr_accessor :name, :sliceID, :oml_uri, :js_url, :ss_url, :job_url, :job_mps, :app_definitions, :property, :cmdline_properties, :show_graph, :nodes, :assertion, :vms
+    attr_reader :groups, :sub_groups, :switches, :vm_groups
 
     # MP only used for injecting metadata
     class MetaData < OML4R::MPBase
@@ -36,6 +36,8 @@ module OmfEc
       @state ||= Hashie::Mash.new #TODO: we need to keep history of all the events and not ovewrite them
       @groups ||= []
       @switches ||= []
+      @vm_groups ||= []
+      @vms ||= []
       @nodes ||= []
       @events ||= []
       @app_definitions ||= Hash.new
@@ -112,21 +114,72 @@ module OmfEc
 
     alias_method :add_resource, :add_or_update_resource_state
 
+    ##
+    # VmGroup resource
+    ##
+
+    # @param [OmfEc::Vm::VmGroup] vm_group
+    def add_vm_group(vm_group)
+      self.synchronize do
+        unless vm_group.kind_of? OmfEc::Vm::VmGroup
+          raise ArgumentError, "Expect VmGroup object, got #{vm_group.inspect}"
+        end
+        @vm_groups << vm_group unless vm_group(vm_group.name)
+      end
+    end
+
+    # @param [String] name
+    def vm_group(name)
+      vm_groups.find { |v| v.name == name }
+    end
+
+    def each_vm_group(&block)
+      if block
+        vm_groups.each { |g| block.call(g) }
+      else
+        vm_groups
+      end
+    end
+
+    def all_vm_groups?(&block)
+      !vm_groups.empty? && vm_groups.all? { |v| block ? block.call(v) : v }
+    end
+
+    ##
+    # Vm resource
+    ##
+
+    # @param [VirtualMachine] vm
+    def add_vm(vm)
+      self.synchronize do
+        unless vm.kind_of? OmfEc::Vm::VirtualMachine
+          raise ArgumentError, "Expect VirtualMachine object, got #{vm.inspect}"
+        end
+        @vms << vm unless @vms.find { |v| v.id == vm.id }
+      end
+    end
+
+    def all_vms?(&block)
+      !vms.empty? && vms.all? { |v| block ? block.call(v) : v }
+    end
+
+
+    ##
     # Ovs resource
-    #
+    ##
 
     # @param [String] name
     def switch(name)
-      switches.find { |v| v.name == name }
+      @switches.find { |v| v.name == name }
     end
 
-    # @param [Switch] ovs
-    def add_switch(switch)
+    # @param [SwitchDescription] ovs
+    def add_switch(sw)
       self.synchronize do
-        unless switch.kind_of? OmfEc::Switch::SwitchDescription
-          raise ArgumentError, "Expect Switch object, got #{switch.inspect}"
+        unless sw.kind_of? OmfEc::Switch::SwitchDescription
+          raise ArgumentError, "Expect Switch object, got #{sw.inspect}"
         end
-        @switches << switch unless switch(switch.name)
+        @switches << sw unless switch(sw.name)
       end
     end
 

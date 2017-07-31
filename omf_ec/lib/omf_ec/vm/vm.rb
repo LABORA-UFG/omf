@@ -16,7 +16,7 @@ module OmfEc::Vm
     attr_reader :vm_topic, :vm_node
     attr_reader :conf_params, :vlans, :users, :req_params, :params
 
-    TIME_TO_VM_RUN = 40
+    TIME_TO_VM_RUN = 58
 
     # @param [String] name name of virtual machine
     def initialize(name, vm_group, &block)
@@ -97,9 +97,9 @@ module OmfEc::Vm
             # wait receive the message of creation of the VM
             @vm_topic.on_message do |msg|
               if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:vm_topic]
+                sleep(TIME_TO_VM_RUN)
                 @vm_node.subscribe(msg.properties[:vm_topic]) do
                   # after created configure the host parameters
-                  sleep(TIME_TO_VM_RUN)
                   self.configure_params
                   block.call if block
                 end

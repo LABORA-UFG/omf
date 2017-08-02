@@ -43,6 +43,12 @@ onEvent(:ALL_VM_GROUPS_UP) do |ev|
         info "Mac da vm-8 = #{vm1_mac}"
       end
     }
+    after(90) {
+      info "Deleting #{vm8.name}"
+      vm8.delete do
+        info "VM Deleted"
+      end
+    }
   end
 end
 

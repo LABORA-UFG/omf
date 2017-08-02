@@ -117,7 +117,7 @@ module OmfEc::Vm
     #
     def run(&block)
       self.recv_vm_topic do
-        @vm_topic.configure(vm_name: self.name, action: :run) do
+        @vm_topic.configure(action: :run) do
           block.call if block
         end
       end
@@ -126,8 +126,12 @@ module OmfEc::Vm
     #
     def stop(&block)
       self.recv_vm_topic do
-        @vm_topic.configure(vm_name: self.name, action: :stop) do
-          block.call if block
+        @vm_topic.configure(action: :stop) do
+          @vm_topic.on_message do |msg|
+            if msg.itype == 'STATUS' and msg.has_properties? and !(msg.properties[:vm_return].nil?) and msg.properties[:vm_return].include? 'VM stopped successfully'
+              block.call if block
+            end
+          end
         end
       end
     end
@@ -135,7 +139,8 @@ module OmfEc::Vm
     #
     def delete(&block)
       self.recv_vm_topic do
-        @vm_topic.configure(vm_name: self.name, action: :delete) do
+        self.stop do
+          @vm_topic.configure(action: :delete)
           block.call if block
         end
       end
@@ -213,7 +218,6 @@ module OmfEc::Vm
       if name =~ /(.+)=/
         operation = :configure
         name = $1
-        arg = *args
         if @conf_params.include?("#{name}")
           @params[name] = *args
         else

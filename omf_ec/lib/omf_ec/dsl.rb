@@ -77,6 +77,14 @@ module OmfEc
 
     # Define a vm group, create a pubsub topic for the vm group.
     #
+    def def_flow_visor(name, topic_name, &block)
+      flowvisor = OmfEc::FlowVisor::FlowVisor.new(name, topic_name)
+      OmfEc.experiment.add_flowvisor(flowvisor)
+      block.call(flowvisor) if block
+    end
+
+    # Define a vm group, create a pubsub topic for the vm group.
+    #
     def def_vm_group(name, topic_name, &block)
       vm_group = OmfEc::Vm::VmGroup.new(name, topic_name)
       OmfEc.experiment.add_vm_group(vm_group)
@@ -91,21 +99,34 @@ module OmfEc
       block.call(switch) if block
     end
 
-    # Get a switch instance
+    # Get a Switch instance
     #
     # @param [String] name name of the switch
     def switch(name, &block)
       switch = OmfEc.experiment.switch(name)
-      raise RuntimeError, "Group #{name} not found" if switch.nil?
+      raise RuntimeError, "Switch '#{name}' not found" if switch.nil?
       block.call(switch) if block
       switch
     end
 
+    # Get a VmGroup instance
+    #
+    # @param [String] name name of the VmGroup
     def vm_group(name, &block)
       vm_group = OmfEc.experiment.vm_group(name)
-      raise RuntimeError, "VmGroup #{name} not found" if vm_group.nil?
+      raise RuntimeError, "VmGroup '#{name}' not found" if vm_group.nil?
       block.call(vm_group) if block
       vm_group
+    end
+
+    # Get a FlowVisor instance
+    #
+    # @param [String] name name of the flowvisor
+    def flowvisor(name, &block)
+      flowvisor = OmfEc.experiment.flowvisor(name)
+      raise RuntimeError, "Flowvisor '#{name}' not found" if flowvisor.nil?
+      block.call(flowvisor) if block
+      flowvisor
     end
 
     # Define a group, create a pubsub topic for the group
@@ -177,6 +198,18 @@ module OmfEc
 
     def all_vms?(&block)
       OmfEc.experiment.all_vms?(&block)
+    end
+
+    def all_flowvisors(&block)
+      OmfEc.experiment.each_flowvisor(&block)
+    end
+
+    def all_flowvisors?(&block)
+      OmfEc.experiment.all_flowvisors?(&block)
+    end
+
+    def all_slices?(&block)
+      OmfEc.experiment.all_slices?(&block)
     end
 
     alias_method :all_nodes!, :all_groups

@@ -24,10 +24,6 @@ onEvent(:ALL_FLOWVISOR_UP) do |event|
   flowvisor('fv1').create('slice1') do
     slice1 = flowvisor('fv1').slice('slice1')
     info "Slice #{slice1.name} created"
-
-    slice1.name do |name|
-      info "Slice #{name}"
-    end
   end
 
   onEvent(:ALL_SLICES_CREATED) do |ev_created|
@@ -41,8 +37,8 @@ onEvent(:ALL_FLOWVISOR_UP) do |event|
 
     after(30) {
       info "Removing openflow flows..."
-      # flowvisor('fv1').releaseAllSlices
       flowvisor('fv1').release('slice1')
+      flowvisor('fv1').releaseAllSlices
     }
 
     after(35) {

@@ -3,11 +3,18 @@
 # You should find a copy of the License in LICENSE.TXT or at http://opensource.org/licenses/MIT.
 # By downloading or using this software you accept the terms and the liability disclaimer in the License.
 
-require 'omf_ec/flowvisor/flow'
-require 'omf_ec/flowvisor/flowvisor'
-require 'omf_ec/flowvisor/slice'
+module OmfEc::FlowVisor
 
-module OmfEc
-  module FlowVisor
+  class Flow
+
+    attr_accessor :id, :name, :operation, :device, :match
+
+    # @param [String] name to identify the flow
+    def initialize(name, &block)
+      super()
+      self.name = name
+    end
+
   end
+
 end

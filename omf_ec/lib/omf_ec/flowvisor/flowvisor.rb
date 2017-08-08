@@ -11,17 +11,19 @@ module OmfEc::FlowVisor
   class FlowVisor
     include MonitorMixin
 
-    attr_accessor :id, :name, :topic_name
-    attr_reader :topic, :slices
+    attr_accessor :id
+    attr_reader :name, :topic_name, :topic, :slices
 
-    # @param [String] name name of virtual machine
+    # @param [String] name of flowvisor
     def initialize(name, topic_name, &block)
       super()
-      self.id = "#{OmfEc.experiment.id}.#{self.name}"
-      self.name = name
-      self.topic_name = topic_name
 
-      OmfEc.subscribe_topic(topic_name, self, &block)
+      @name = name
+      @topic_name = topic_name
+      @slices = {}
+      self.id = "#{OmfEc.experiment.id}.#{@name}"
+
+      OmfEc.subscribe_topic(@topic_name, self, &block)
     end
 
     # Verify if has a virtual machine topic associated with this class.
@@ -37,21 +39,32 @@ module OmfEc::FlowVisor
       end
     end
 
-    def addSlice(name)
+    def addSlice(name, &block)
+      raise("The slice '#{name}' already created") unless slice(name)
 
+      slice = OmfEc.FlowVisor.Slice.new(name)
+      @slices[slice.name] = slice
+      OmfEc.experiment.add_slice(slice)
+      block.call(slice) if block
     end
 
     def createAllSlices
+      raise('This function need to be executed after ALL_FLOWVISOR_UP event') unless has_topic
 
+      @slices.each_value do |slice|
+        create(slice.name)
+      end
     end
 
     def create(name, &block)
-      raise('This function need to be executed after ALL_FLOWVISOR_UP event') unless @topic
+      raise('This function need to be executed after ALL_FLOWVISOR_UP event') unless has_topic
 
       slice = slice(name)
-      raise("Slice '#{name}' object is not defined") unless slice
-
-      raise("Slice '#{name}' already created") unless slice.has_topic
+      raise("The slice '#{name}' is not defined") unless slice
+      if slice.has_topic
+        warn("The slice '#{name}' already created")
+        block.call if block
+      end
 
       @topic.create(:flowvisor_proxy, {name: slice.name, controller_url: slice.controller}) do |msg|
         if msg.success?
@@ -62,18 +75,37 @@ module OmfEc::FlowVisor
             block.call if block
           end
         else
-          error ">>> Slice creation failed - #{msg[:reason]}"
+          error "The creation of slice '#{self.name}' failed - #{msg[:reason]}"
         end
       end
-
     end
 
-    def release(name)
+    def releaseAllSlices
+      raise('This function need to be executed after ALL_FLOWVISOR_UP event') unless has_topic
 
+      @slices.each_value do |slice|
+        release(slice.name)
+      end
+    end
+
+    def release(name, &block)
+      raise('This function need to be executed after ALL_FLOWVISOR_UP event') unless has_topic
+
+      slice = slice(name)
+      raise("The slice '#{name}' is not defined") unless slice
+      if slice.has_topic
+        @topic.release(slice.topic) do |msg|
+          info "Released slice #{msg[:res_id]}"
+          @slices.delete(slice.name)
+          block.call if block
+        end
+      else
+        warn "The slice '#{slice.name}' need to be created first"
+      end
     end
 
     def slice(name)
-      self.slices.find {|s| s.name == name}
+      @slices[name]
     end
 
   end

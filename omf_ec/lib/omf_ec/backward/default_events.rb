@@ -131,6 +131,27 @@ module OmfEc
               all_vms_created?(state)
             end
 
+            # FlowVisor
+            def all_flowvisor_created?(state)
+              all_flowvisors? do |flowvisor|
+                flowvisor.has_topic
+              end
+            end
+
+            def_event :ALL_FLOWVISOR_UP do |state|
+              all_flowvisor_created?(state)
+            end
+
+            def all_slices_created?(state)
+              all_slices? do |slice|
+                slice.has_topic
+              end
+            end
+
+            def_event :ALL_SLICES_CREATED do |state|
+              all_slices_created?(state)
+            end
+
             alias_event :ALL_UP_AND_INSTALLED, :ALL_APPS_UP
 
             def_event :ALL_APPS_DONE do |state|

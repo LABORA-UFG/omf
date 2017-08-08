@@ -124,7 +124,7 @@ module OmfEc
     # @param [OmfEc::FlowVisor::FlowVisor] flowvisor
     def add_flowvisor(flowvisor)
       self.synchronize do
-        unless flowvisor.kind_of? OmfEc::Vm::VmGroup
+        unless flowvisor.kind_of? OmfEc::FlowVisor::FlowVisor
           raise ArgumentError, "Expect FlowVisor object, got #{flowvisor.inspect}"
         end
         @flowvisors << flowvisor unless flowvisor(flowvisor.name)
@@ -150,8 +150,8 @@ module OmfEc
 
     def add_slice(slice)
       self.synchronize do
-        unless slice.kind_of? OmfEc::Vm::VirtualMachine
-          raise ArgumentError, "Expect VirtualMachine object, got #{slice.inspect}"
+        unless slice.kind_of? OmfEc::FlowVisor::Slice
+          raise ArgumentError, "Expect Slice object, got #{slice.inspect}"
         end
         @slices << slice unless @slices.find { |s| s.id == slice.id }
       end

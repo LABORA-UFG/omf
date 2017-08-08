@@ -17,7 +17,7 @@ module OmfEc
     include MonitorMixin
 
     attr_accessor :name, :sliceID, :oml_uri, :js_url, :ss_url, :job_url, :job_mps, :app_definitions, :property, :cmdline_properties, :show_graph, :nodes, :assertion, :vms
-    attr_reader :groups, :sub_groups, :switches, :vm_groups
+    attr_reader :groups, :sub_groups, :switches, :vm_groups, :flowvisors, :slices
 
     # MP only used for injecting metadata
     class MetaData < OML4R::MPBase
@@ -38,6 +38,8 @@ module OmfEc
       @switches ||= []
       @vm_groups ||= []
       @vms ||= []
+      @flowvisors ||= []
+      @slices ||= []
       @nodes ||= []
       @events ||= []
       @app_definitions ||= Hash.new
@@ -113,6 +115,51 @@ module OmfEc
     end
 
     alias_method :add_resource, :add_or_update_resource_state
+
+
+    ##
+    # FlowVisor resource
+    ##
+
+    # @param [OmfEc::FlowVisor::FlowVisor] flowvisor
+    def add_flowvisor(flowvisor)
+      self.synchronize do
+        unless flowvisor.kind_of? OmfEc::FlowVisor::FlowVisor
+          raise ArgumentError, "Expect FlowVisor object, got #{flowvisor.inspect}"
+        end
+        @flowvisors << flowvisor unless flowvisor(flowvisor.name)
+      end
+    end
+
+    # @param [String] name
+    def flowvisor(name)
+      flowvisors.find { |f| f.name == name }
+    end
+
+    def each_flowvisor(&block)
+      if block
+        flowvisors.each { |g| block.call(g) }
+      else
+        flowvisors
+      end
+    end
+
+    def all_flowvisors?(&block)
+      !flowvisors.empty? && flowvisors.all? { |f| block ? block.call(f) : f }
+    end
+
+    def add_slice(slice)
+      self.synchronize do
+        unless slice.kind_of? OmfEc::FlowVisor::Slice
+          raise ArgumentError, "Expect Slice object, got #{slice.inspect}"
+        end
+        @slices << slice unless @slices.find { |s| s.id == slice.id }
+      end
+    end
+
+    def all_slices?(&block)
+      !slices.empty? && slices.all? { |s| block ? block.call(s) : s }
+    end
 
     ##
     # VmGroup resource

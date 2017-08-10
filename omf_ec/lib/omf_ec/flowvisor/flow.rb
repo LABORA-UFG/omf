@@ -10,7 +10,7 @@ module OmfEc::FlowVisor
     attr_accessor :id, :name, :operation, :device, :match
 
     # @param [String] name to identify the flow
-    def initialize(name, &block)
+    def initialize(name)
       super()
       self.name = name
     end

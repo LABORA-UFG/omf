@@ -45,7 +45,7 @@ module OmfEc::FlowVisor
       slice = OmfEc.FlowVisor.Slice.new(name)
       @slices[slice.name] = slice
       OmfEc.experiment.add_slice(slice)
-      block.call(slice) if block
+      block ? block.call(slice) : slice
     end
 
     def createAllSlices
@@ -61,9 +61,11 @@ module OmfEc::FlowVisor
 
       slice = slice(name)
       raise("The slice '#{name}' is not defined") unless slice
+
       if slice.has_topic
         warn("The slice '#{name}' already created")
         block.call if block
+        return
       end
 
       @topic.create(:flowvisor_proxy, {name: slice.name, controller_url: slice.controller}) do |msg|
@@ -93,6 +95,7 @@ module OmfEc::FlowVisor
 
       slice = slice(name)
       raise("The slice '#{name}' is not defined") unless slice
+
       if slice.has_topic
         @topic.release(slice.topic) do |msg|
           info "Released slice #{msg[:res_id]}"

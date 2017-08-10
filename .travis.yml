@@ -10,7 +10,7 @@ rvm:
 # Branch white list
 branches:
   only:
-  - master
+  - amqp
 
 notifications:
   email:

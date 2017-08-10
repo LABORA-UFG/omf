@@ -72,12 +72,12 @@ module OmfEc::FlowVisor
         if msg.success?
           slice_topic = msg.resource
           slice_topic.on_subscribed do
-            info ">>> Connected to newly created slice #{msg[:res_id]} with name #{msg[:name]}"
+            info(">>> Connected to newly created slice #{msg[:res_id]} with name #{msg[:name]}")
             slice.associate_topic(slice_topic)
             block.call if block
           end
         else
-          error "The creation of slice '#{self.name}' failed - #{msg[:reason]}"
+          error("The creation of slice '#{self.name}' failed - #{msg[:reason]}")
         end
       end
     end
@@ -98,12 +98,12 @@ module OmfEc::FlowVisor
 
       if slice.has_topic
         @topic.release(slice.topic) do |msg|
-          info "Released slice #{msg[:res_id]}"
+          info("Released slice #{msg[:res_id]}")
           @slices.delete(slice.name)
           block.call if block
         end
       else
-        warn "The slice '#{slice.name}' need to be created first"
+        warn("The slice '#{slice.name}' need to be created first")
       end
     end
 

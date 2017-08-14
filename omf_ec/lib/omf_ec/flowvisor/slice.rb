@@ -14,7 +14,7 @@ module OmfEc::FlowVisor
     attr_reader :name, :topic, :flows
 
     # @param [String] name of slice
-    def initialize(name, &block)
+    def initialize(name)
       super()
       @name = name
       @flows = []
@@ -26,19 +26,20 @@ module OmfEc::FlowVisor
       !@topic.nil?
     end
 
-    # Associate the topic reference when the subscription is received from OmfEc::subscribe_topic
-    # @param [Object] topic
+    # Associate the topic reference when the subscription is received from OmfEc::FlowVisor::FlowVisor::create
+    # @param [Topic] topic
     def associate_topic(topic)
       self.synchronize do
         @topic = topic
-        self._log_messages
+        self.__log_messages
       end
     end
 
-    def _log_messages
+    def __log_messages
       raise('This function need to be executed after the slice creation') unless has_topic
+
       @topic.on_message do |msg|
-        error "Messages::Slice::'#{@name}': #{msg[:reason]}"
+        info("Messages::Slice::'#{@name}': #{msg[:reason]}")
       end
     end
 
@@ -48,29 +49,49 @@ module OmfEc::FlowVisor
 
     def addFlow(name, &block)
       flow = OmfEc.FlowVisor.Flow.new(name)
-      @flows << flow
-      block.call(flow) if block
+      if flow(name)
+        error("The flow '#{name}' already added.")
+      else
+        @flows << flow
+        block ? block.call(flow) : flow
+      end
     end
 
     def installFlows(&block)
       raise('This function need to be executed after the slice creation') unless has_topic
-      unless has_flows
-        error("The are no flows added in slice '#{@name}'")
-        return
-      end
 
-      list_flows = []
-      @flows.each do |flow|
-        list_flows << {operation: flow.operation, device: flow.device, match: flow.match, name: flow.name}
+      if has_flows
+        list_flows = []
+        @flows.each do |flow|
+          list_flows << {operation: flow.operation, device: flow.device, match: flow.match, name: flow.name}
+        end
+        self.__create_flows(list_flows, &block)
+      else
+        warn("The are no flows added in slice '#{@name}'")
       end
+    end
+
+    def create(name, &block)
+      raise('This function need to be executed after the slice creation') unless has_topic
+
+      flow = flow(name)
+      flow ? self.__create_flows(Array.new(flow), &block) : error("The flow '#{name}' not exists.")
+    end
+
+    def __create_flows(list_flows, &block)
+      raise('This function need to be executed after the slice creation') unless has_topic
 
       @topic.configure(flows: list_flows) do |reply_msg|
-        info "Flow of slice #{@name} configured:"
+        info("Flow of slice #{@name} configured:")
         reply_msg[:flows].each do |flow|
-          info " Added flow: #{flow}"
+          info("Added flow: #{flow}")
         end
         block.call if block
       end
+    end
+
+    def flow(name)
+      self.flows.find {|f| f.name == name}
     end
 
   end

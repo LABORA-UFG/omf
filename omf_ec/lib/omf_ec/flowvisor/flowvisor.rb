@@ -45,7 +45,7 @@ module OmfEc::FlowVisor
       slice = OmfEc.FlowVisor.Slice.new(name)
       @slices[slice.name] = slice
       OmfEc.experiment.add_slice(slice)
-      block.call(slice) if block
+      block ? block.call(slice) : slice
     end
 
     def createAllSlices
@@ -61,21 +61,23 @@ module OmfEc::FlowVisor
 
       slice = slice(name)
       raise("The slice '#{name}' is not defined") unless slice
+
       if slice.has_topic
         warn("The slice '#{name}' already created")
         block.call if block
+        return
       end
 
       @topic.create(:flowvisor_proxy, {name: slice.name, controller_url: slice.controller}) do |msg|
         if msg.success?
           slice_topic = msg.resource
           slice_topic.on_subscribed do
-            info ">>> Connected to newly created slice #{msg[:res_id]} with name #{msg[:name]}"
+            info(">>> Connected to newly created slice #{msg[:res_id]} with name #{msg[:name]}")
             slice.associate_topic(slice_topic)
             block.call if block
           end
         else
-          error "The creation of slice '#{self.name}' failed - #{msg[:reason]}"
+          error("The creation of slice '#{self.name}' failed - #{msg[:reason]}")
         end
       end
     end
@@ -93,14 +95,15 @@ module OmfEc::FlowVisor
 
       slice = slice(name)
       raise("The slice '#{name}' is not defined") unless slice
+
       if slice.has_topic
         @topic.release(slice.topic) do |msg|
-          info "Released slice #{msg[:res_id]}"
+          info("Released slice #{msg[:res_id]}")
           @slices.delete(slice.name)
           block.call if block
         end
       else
-        warn "The slice '#{slice.name}' need to be created first"
+        warn("The slice '#{slice.name}' need to be created first")
       end
     end
 

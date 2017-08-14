@@ -75,7 +75,7 @@ module OmfCommon
 
       # Only used for create, configure and request
       def create_message_and_publish(type, props = {}, core_props = {}, block = nil)
-        debug "(#{id}) create_message_and_publish '#{type}': #{props.inspect}: #{core_props.inspect}"
+        debug "(#{id}) create_message_and_publish '#{type}': #{props.to_s}: #{core_props.to_s}"
         core_props[:src] ||= OmfCommon.comm.local_address
         msg = OmfCommon::Message.create(type, props, core_props)
         publish(msg, { routing_key: "o.op" }, &block)
@@ -173,7 +173,7 @@ module OmfCommon
       #
       def on_incoming_message(msg)
         type = msg.operation
-        debug "(#{id}) Deliver message '#{type}': #{msg.inspect}"
+        debug "(#{id}) Deliver message '#{type}': #{msg.to_s}"
         htypes = [type, :message]
         if type == :inform
           # TODO keep converting itype is painful, need to solve this.

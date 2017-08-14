@@ -57,6 +57,7 @@ module OmfRc::ResourceProxy::Hipervisor
   property :enable_omf, :default => true
   property :image_directory, :default => VM_DIR_DEFAULT
   property :image_path, :default => VM_DIR_DEFAULT
+  property :broker_topic_name, :default => "am_controller"
 
   # Properties to run ssh command
   property :ssh_params, :default => {
@@ -66,20 +67,21 @@ module OmfRc::ResourceProxy::Hipervisor
       key_file: "/root/.ssh/id_rsa"
   }
 
-  hook :before_ready do |res|
-    res.property.vms_path ||= "/var/lib/libvirt/images/"
-    res.property.vm_list ||= []
+  hook :before_ready do |resource|
+    resource.property.vms_path ||= "/var/lib/libvirt/images/"
+    resource.property.vm_list ||= []
   end
 
   hook :before_create do |res, type, opts = nil|
-    if type.to_sym != :virtual_machine
-      raise "This resource only creates VM! (Cannot create a resource: #{type})"
+    if type.to_sym == :virtual_machine
+      raise 'You need to inform the virtual machine label' if opts[:label].nil?
+      opts[:broker_topic_name] = res.property.broker_topic_name
     end
+    raise "This resource only creates VM! (Cannot create a resource: #{type})"
   end
 
   hook :after_create do |res, child_res|
     logger.info "Created new child VM: #{child_res.uid}"
     res.property.vm_list << child_res.uid
   end
-
 end

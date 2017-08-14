@@ -1,3 +1,5 @@
+require "base64"
+
 module OmfRc::ResourceProxy::VirtualNode
   include OmfRc::ResourceProxyDSL
 
@@ -7,56 +9,48 @@ module OmfRc::ResourceProxy::VirtualNode
   utility :ip
 
   property :if_name, :default => "eth0"
+  property :broker_topic_name, :default => "am_controller"
 
-  configure :if_name do |res, value|
-    res.property.if_name = value
+  @broker_topic = nil
+  @vm_topic = nil
+
+  hook :before_ready do |resource|
+    debug "Subscribing to broker topic: #{resource.property.broker_topic_name}"
+    OmfCommon.comm.subscribe(resource.property.broker_topic_name) do |topic|
+      if topic.error?
+        raise "Could not subscribe to broker topic"
+      end
+      @broker_topic = topic
+
+      debug "Creating broker virtual machine resource with mac_address: #{resource.uid}"
+      @broker_topic.create(:virtual_machine, {:mac_address => resource.uid}) do |msg|
+        if msg.error?
+          raise "Could not create broker virtual machine resource topic"
+        end
+        debug "Broker virtual machine resource created successfully!"
+        @vm_topic = msg.resource
+        Thread.new {
+          info 'Waiting 30 seconds to finalize VM setup with broker...'
+          sleep(30)
+          resource.finish_vm_setup_with_broker
+          resource.configure_broker_vm
+        }.start()
+      end
+    end
   end
 
-  request :vm_ip do |res|
-    cmd = "/sbin/ip -f inet -o addr show #{res.property.if_name} | cut -d\\  -f 7 | cut -d/ -f 1"
-
-    res.execute_cmd(cmd, "Getting the ip of #{res.property.if_name}",
+  request :vm_ip do |resource|
+    cmd = "/sbin/ifconfig #{resource.property.if_name} | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1"
+    resource.execute_cmd(cmd, "Getting the ip of #{resource.property.if_name}",
                     "It was not possible to get the IP!", "IP was successfully got!")
+  end
 
+  request :vm_mac do |resource|
+    resource.uid
   end
 
   configure :hostname do |res, value|
     res.change_hostname(value)
-  end
-
-  work :change_hostname do |res, new_hostname|
-    current_hostname = File.read('/etc/hostname').delete("\n")
-    File.write('/etc/hostname', new_hostname)
-
-    hosts_content = File.read('/etc/hosts')
-    hosts_content = hosts_content.gsub(current_hostname, new_hostname)
-
-    File.write('/etc/hosts', hosts_content)
-  end
-
-  configure :user do |res, opts|
-    user_data = opts[0]
-    username = user_data[:username]
-    password = user_data[:password]
-    res.create_user(username, password)
-  end
-
-  work :create_user do |res, username, password|
-    pwd = password.crypt("Xn1d9a1")
-    cmd = "/usr/sbin/useradd #{username} -p #{pwd} -m -s /bin/bash && adduser #{username} sudo"
-
-    res.execute_cmd(cmd, "Adding a new user...",
-                    "Cannot add the user!", "User was successfully added!")
-
-    cmd = "/usr/sbin/deluser testbed && rm -rf /home/testbed"
-
-    res.execute_cmd(cmd, "Removing default user...",
-                    "Cannot remove the user!", "User was successfully removed!")
-  end
-
-  request :vm_mac do |res|
-    require 'macaddr'
-    Mac.address
   end
 
   configure :vlan do |res, opts|
@@ -79,4 +73,47 @@ module OmfRc::ResourceProxy::VirtualNode
                     "Vlan #{vlan_id} successfully configured on #{interface}!")
   end
 
+  work :change_hostname do |res, new_hostname|
+    current_hostname = File.read('/etc/hostname').delete("\n")
+    File.write('/etc/hostname', new_hostname)
+
+    hosts_content = File.read('/etc/hosts')
+    hosts_content = hosts_content.gsub(current_hostname, new_hostname)
+
+    File.write('/etc/hosts', hosts_content)
+  end
+
+  work :finish_vm_setup_with_broker do |resource|
+    unless @vm_topic.nil?
+      info 'Finishing setup with broker...'
+
+      cmd = "echo '' > /root/.ssh/authorized_keys"
+      resource.execute_cmd(cmd, "Clearing ssh public keys...",
+                           "Cannot clear ssh public keys", "SSH public keys cleaned")
+
+      @vm_topic.request([:user_public_keys]) do |msg|
+        vm_keys = msg[:user_public_keys]
+        vm_keys.each do |key|
+          key[:ssh_key] = Base64.decode64(key[:ssh_key]) if key[:is_base64]
+          cmd = "echo '#{key[:ssh_key]}' >> /root/.ssh/authorized_keys"
+          resource.execute_cmd(cmd, "Adding user public key '#{key[:ssh_key]}' to authorized_keys",
+                          "Cannot add public key", "Public key succesfully added")
+        end
+      end
+    end
+  end
+
+  work :configure_broker_vm do |resource|
+    unless @vm_topic.nil?
+      ip_address = resource.request_vm_ip
+      status = 'UP_AND_READY'
+
+      info "Setting vm status on broker to  and ip address to '#{ip_address}'"
+      @vm_topic.configure(status: status, ip_address: ip_address) do |msg|
+        if msg.error?
+          raise "Could not finish vm setup with broker: #{msg}"
+        end
+      end
+    end
+  end
 end

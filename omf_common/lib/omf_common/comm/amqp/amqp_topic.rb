@@ -88,7 +88,7 @@ module OmfCommon
         def _send_message(msg, opts = {}, block = nil)
           super
           content_type, content = msg.marshall(self)
-          debug "(#{id}) Send message (#{content_type}) #{msg.inspect} TO #{opts[:routing_key]}"
+          debug "(#{id}) Send message (#{content_type}) #{msg.to_s} TO #{opts[:routing_key]}"
           if @exchange
             @exchange.publish(content, content_type: content_type, message_id: msg.mid, routing_key: opts[:routing_key])
             MPPublished.inject(Time.now.to_f, @address, msg.mid) if OmfCommon::Measure.enabled?

@@ -95,6 +95,7 @@ module OmfRc
         OmfCommon.comm.on_connected do |comm|
           info "Connected using #{comm.conn_info}"
 
+          OmfCommon::Auth.init
           rc_cert = OmfCommon.load_credentials(@opts[:credentials])
 
           @opts[:resources].each do |res_opts|

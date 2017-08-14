@@ -233,14 +233,36 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :vm_original_clone, :default => ''
   property :vm_os, :default => VM_OS_DEFAULT
   property :omf_opts, :default => OMF_DEFAULT
+  property :broker_topic_name
 
   property :vm_opts
 
-  hook :before_ready do |res|
-    parent = res.opts.parent
+  @broker_topic = nil
+  @vm_topic = nil
+
+  hook :before_ready do |resource|
+    parent = resource.opts.parent
 
     # merging properties with parent properties
-    res.property = res.property.merge(parent.property)
+    resource.property = resource.property.merge(parent.property)
+
+    # broker config...
+    debug "Subscribing to broker topic: #{resource.property.broker_topic_name}"
+    OmfCommon.comm.subscribe(resource.property.broker_topic_name) do |topic|
+      if topic.error?
+        raise "Could not subscribe to broker topic"
+      end
+      @broker_topic = topic
+
+      debug "Checking if virtual machine '#{opts[:label]}' is available"
+      @broker_topic.create(:virtual_machine, {:label => opts[:label]}) do |msg|
+        if msg.error?
+          raise "The virtual machine '#{opts[:label]}' is not available"
+        end
+        debug "Virtual machine '#{opts[:label]}' AVAILABLE!"
+        @vm_topic = msg.resource
+      end
+    end
   end
 
   # Configure the OMF property of this VM Proxy.
@@ -325,6 +347,21 @@ module OmfRc::ResourceProxy::VirtualMachine
 
     if vm_state.include? "Domain not found"
       res.property.vm_topic = res.send("build_img_with_#{res.property.img_builder}")
+
+      # ----Setting up broker vm info ----
+      is_created = !res.property.vm_topic.include? "error:"
+      status = is_created ? 'BOOTING' : 'CREATION_ERROR'
+      broker_info = {
+          :status => status
+      }
+      if is_created
+        broker_info[:mac_address] = res.property.vm_topic
+      end
+
+      res.set_broker_info(broker_info)
+      res.inform(:vm_state, status)
+      # ---- end broker integration ----
+
       res.inform(:status, {vm_topic: "#{res.property.vm_topic}"})
     else
       res.log_inform_error "Cannot build VM image: it is not stopped"+
@@ -335,6 +372,17 @@ module OmfRc::ResourceProxy::VirtualMachine
 
   configure_all do |res, conf_props, conf_result|
     conf_props.each { |k, v| conf_result[k] = res.__send__("configure_#{k}", v) }
+  end
+
+  work :set_broker_info do |resource, broker_info|
+    unless @vm_topic.nil?
+      debug "Sending broker VM info: '#{broker_info}'"
+      @vm_topic.configure(broker_info) do |msg|
+        if msg.error?
+          raise "Could not set broker info: #{msg}"
+        end
+      end
+    end
   end
 
   work :define_vm do |res|

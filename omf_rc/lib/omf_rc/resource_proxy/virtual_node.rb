@@ -34,7 +34,7 @@ module OmfRc::ResourceProxy::VirtualNode
           sleep(30)
           resource.finish_vm_setup_with_broker
           resource.configure_broker_vm
-        }.start()
+        }
       end
     end
   end

@@ -346,10 +346,11 @@ module OmfRc::ResourceProxy::VirtualMachine
     vm_state = res.check_state_vm(res)
 
     if vm_state.include? "Domain not found"
-      res.property.vm_topic = res.send("build_img_with_#{res.property.img_builder}")
+      result = res.send("build_img_with_#{res.property.img_builder}")
+      res.property.vm_topic = result
 
       # ----Setting up broker vm info ----
-      is_created = !res.property.vm_topic.include? "error:"
+      is_created = !(res.property.vm_topic.include? "error:")
       status = is_created ? 'BOOTING' : 'CREATION_ERROR'
       broker_info = {
           :status => status

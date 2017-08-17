@@ -105,8 +105,7 @@ module OmfEc
     def switch(name, &block)
       switch = OmfEc.experiment.switch(name)
       raise RuntimeError, "Switch '#{name}' not found" if switch.nil?
-      block.call(switch) if block
-      switch
+      block ? block.call(switch) : switch
     end
 
     # Get a VmGroup instance

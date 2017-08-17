@@ -21,8 +21,8 @@ module OmfEc::Switch
       self.name = name
       self.topic_name = topic_name
       self.id = "#{OmfEc.experiment.id}.#{self.name}"
-      self.params = {}
-      self.flows = []
+      @params = {}
+      @flows = {}
 
       OmfEc.subscribe_topic(topic_name, self, &block)
     end
@@ -48,8 +48,10 @@ module OmfEc::Switch
     #     ovs.controller = ["tcp:192.168.0.100:6633"]
     #   end
     def configure_params
-      self.params.each do |key, value|
-        send_message(key, value, :configure)
+      info "Configuring params"
+      @params.each do |key, value|
+        info "#{key}, #{value}"
+        __send_message(key, value, :configure)
       end
     end
 
@@ -66,13 +68,13 @@ module OmfEc::Switch
       if name =~ /(.+)=/
         operation = :configure
         name = $1
-        self.params[name] = *args
+        @params[name] = *args
       else
         operation = :request
       end
 
       if self.has_topic
-        send_message(name, *args, operation, &block)
+        __send_message(name, *args, operation, &block)
       elsif operation == :request
         error "Operation :request of #{name} is not allowed in this moment."
         return nil
@@ -84,14 +86,18 @@ module OmfEc::Switch
     # @param [String] name of the property
     # @param [Object] value of the property, for configuring
     # @param [Object] operation to be send, :configure or :request
-    def send_message(name, value = nil, operation = :request, &block)
+    def __send_message(name, value = nil, operation = :request, &block)
       topic = self.topic
       case operation
         when :configure
-          topic.configure({ name => value }, {assert: OmfEc.experiment.assertion })
+          topic.configure({ name => value }, {assert: OmfEc.experiment.assertion }) do |msg|
+            error "Could not configure '#{name}' at this time." unless msg.success?
+            info msg[name]
+            block.call(msg[name]) if block
+          end
         when :request
           topic.request([name], {assert: OmfEc.experiment.assertion }) do |msg|
-            error "Could not get #{name} at this time." unless msg.success?
+            error "Could not get '#{name}' at this time." unless msg.success?
             block.call(msg[name]) if block
           end
         else
@@ -103,44 +109,55 @@ module OmfEc::Switch
     # To be create a flow in switch, first we need create it and after add the match and actions of flow.
     # @param [String] name to identify the flow on the switch
     # @param [Object] block
-    def addFlow(name, &block)
-      flow = OmfEc::Switch::SwitchFlow.new(name)
-      if switch_flow(name)
+    def addFlow(name, flow)
+      if __switch_flow(name)
         raise("Already exists a flow with name '#{name}'")
       else
-        self.flows << flow
-        block.call(flow) if flow
+        @flows[name] = flow
       end
     end
 
     # Install all flows in switch
-    def installFlows
-      flows_s = self.flows.map {|flow| flow.flow_s}
-      self.add_flows(flows_s)
+    def installFlows(&block)
+      if @flows.values.empty?
+        error 'There are no flows to be installed, add at least one flow before using this function.'
+      else
+        self.__add_flows(@flows.values, &block)
+      end
     end
 
     # Install a flow in switch
-    def installFlow(name)
-      flow = switch_flow(name)
-      if flow then
-        self.add_flows(Array.new(flow.flow_s))
+    def installFlow(name, &block)
+      info "Install flow #{name}"
+      flow = __switch_flow(name)
+      if flow
+        self.__add_flows([flow], &block)
       else
         error "The flow with name '#{name}' not exist."
       end
     end
 
     # Removes all flows from switch
-    def delFlows
-      flows_s = self.flows.map {|flow| flow.match_s}
-      self.del_flows(flows_s)
+    def delFlows(&block)
+      if @flows.values.empty?
+        error 'There are no flows to be removed, add at least one flow before using this function.'
+      else
+        self.__del_flows(@flows.values.map{|f| __get_only_flow_match(f)}) do
+          @flows = {}
+          block.call if block
+        end
+      end
     end
 
     # Removes a flow from switch
     # @param [String] name of flow to be removed
-    def delFlow(name)
-      flow = switch_flow(name)
-      if flow then
-        self.del_flows(Array.new(flow.match_s))
+    def delFlow(name, &block)
+      flow = __switch_flow_match(name)
+      if flow
+        self.__del_flows([flow]) do
+          @flows.delete(name)
+          block.call if block
+        end
       else
         error "The flow with name '#{name}' not exist."
       end
@@ -173,11 +190,11 @@ module OmfEc::Switch
     #   # Adding flows in a ovs switch
     #   switch('ovs').addFlows(["in_port=1,action=output:2", "in_port=2,action=output:1"])
     #
-    def add_flows(flows)
+    def __add_flows(flows, &block)
       raise('This function need to be executed after ALL_SWITCHES_UP event') unless self.has_topic
       @topic.configure(add_flows: flows) do |msg|
         if msg.success?
-          info "Flows added with success: #{msg[:add_flows]}"
+          block.call if block
         else
           info "Could not add flows: #{msg[:add_flows]}"
         end
@@ -192,11 +209,12 @@ module OmfEc::Switch
     #   # Removing flows of a ovs switch
     #   switch('ovs').delFlows(["in_port=1", "in_port=2"])
     #
-    def del_flows(flows)
+    def __del_flows(flows, &block)
       raise('This function need to be executed after ALL_SWITCHES_UP event') unless self.has_topic
       @topic.configure(del_flows: flows) do |msg|
         if msg.success?
           info "Flows removed with success: #{msg[:del_flows]}"
+          block.call if block
         else
           info "Could not remove flows: #{msg[:del_flows]}"
         end
@@ -204,8 +222,17 @@ module OmfEc::Switch
     end
 
     # Select the specific flow by name
-    def switch_flow(name)
-      flows.find { |f| f.name == name }
+    def __switch_flow(name)
+      @flows[name]
+    end
+
+    def __switch_flow_match(name)
+      flow = __switch_flow(name)
+      __get_only_flow_match(flow)
+    end
+
+    def __get_only_flow_match(flow)
+      flow.split(',action')[0] if flow.include? ',action'
     end
 
   end

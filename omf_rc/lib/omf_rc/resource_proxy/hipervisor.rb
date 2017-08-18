@@ -76,8 +76,12 @@ module OmfRc::ResourceProxy::Hipervisor
     if type.to_sym == :virtual_machine
       raise 'You need to inform the virtual machine label' if opts[:label].nil?
       opts[:broker_topic_name] = res.property.broker_topic_name
+      opts[:vm_name] = opts[:label]
+      opts[:image_directory] = res.property.image_directory
+      opts[:image_path] = "#{opts[:image_directory]}/#{opts[:label]}"
+    else
+      raise "This resource only creates VM! (Cannot create a resource: #{type})"
     end
-    raise "This resource only creates VM! (Cannot create a resource: #{type})"
   end
 
   hook :after_create do |res, child_res|

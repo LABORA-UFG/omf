@@ -224,6 +224,13 @@ module OmfRc::ResourceProxy::VirtualMachine
                 topic: nil
                 })
 
+  # Broker status
+  BROKER_STATUS_BOOTING = 'BOOTING'
+  BROKER_STATUS_SHOOTING_DOWN = 'SHOOTING_DOWN'
+  BROKER_STATUS_DOWN = 'DOWN'
+  BROKER_STATUS_CREATING = 'CREATING'
+  BROKER_STATUS_CREATION_ERROR = 'CREATION_ERROR'
+
   property :action, :default => :stop
   property :state, :default => :stopped
   property :ready, :default => false
@@ -233,12 +240,14 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :vm_original_clone, :default => ''
   property :vm_os, :default => VM_OS_DEFAULT
   property :omf_opts, :default => OMF_DEFAULT
+  property :label
   property :broker_topic_name
-
-  property :vm_opts
+  property :vm_opts, :default => {}
 
   @broker_topic = nil
   @vm_topic = nil
+  @started = false
+  @configure_list_opts = []
 
   hook :before_ready do |resource|
     parent = resource.opts.parent
@@ -248,20 +257,49 @@ module OmfRc::ResourceProxy::VirtualMachine
 
     # broker config...
     debug "Subscribing to broker topic: #{resource.property.broker_topic_name}"
+    resource.inform(:info, Hashie::Mash.new({:info => "Getting VM resource in broker, this can take a while..."}))
     OmfCommon.comm.subscribe(resource.property.broker_topic_name) do |topic|
       if topic.error?
-        raise "Could not subscribe to broker topic"
-      end
-      @broker_topic = topic
+        error = "Could not subscribe to broker topic"
+        resource.log_inform_error(error)
+      else
+        @broker_topic = topic
 
-      debug "Checking if virtual machine '#{opts[:label]}' is available"
-      @broker_topic.create(:virtual_machine, {:label => opts[:label]}) do |msg|
-        if msg.error?
-          raise "The virtual machine '#{opts[:label]}' is not available"
+        debug "Checking if virtual machine '#{resource.property.label}' is available"
+        @broker_topic.create(:virtual_machine, {:label => resource.property.label}) do |msg|
+          if msg.error?
+            error = "The virtual machine '#{resource.property.label}' is not available"
+            resource.log_inform_error(error)
+          else
+            debug "Virtual machine '#{resource.property.label}' AVAILABLE!"
+            resource.inform(:info, Hashie::Mash.new({:info => "Broker VM successfully got!"}))
+            @vm_topic = msg.resource
+            resource.get_vm_opts
+          end
         end
-        debug "Virtual machine '#{opts[:label]}' AVAILABLE!"
-        @vm_topic = msg.resource
       end
+    end
+  end
+
+  request :state do |res|
+    res.send("check_state_vm")
+  end
+
+  # Checks if resource is ready to receive configure commands
+  configure_all do |res, conf_props, conf_result|
+    if @started && @vm_topic.nil?
+      raise "This virtual machine '#{res.property.label}' is not avaiable, so nothing can be configured"
+    end
+
+    if @started
+      conf_props.each { |k, v| conf_result[k] = res.__send__("configure_#{k}", v) }
+    else
+      configure_call = {
+          :conf_props => conf_props,
+          :conf_result => conf_result
+      }
+      debug "Resource not started yet, saving configure call: #{configure_call}..."
+      @configure_list_opts << configure_call
     end
   end
 
@@ -291,37 +329,18 @@ module OmfRc::ResourceProxy::VirtualMachine
 
   configure :vm_opts do |res, opts|
     if opts.kind_of? Hash
-        res.property.vm_opts = opts
+      res.property.vm_opts = {} unless res.property.vm_opts.kind_of? Hash
+      # Actually, the user only can set bridges, other params are set by getting broker data
+      opts.each do |k, v|
+        if k == "bridges"
+          res.property.vm_opts[:bridges] = v
+        end
+      end
     else
       res.log_inform_error "OMF option configuration failed! "+
                                "Options not passed as Hash (#{opts.inspect})"
     end
     res.property.vm_opts
-  end
-
-  # Configure the name for the VM associated to this VM Proxy.
-  # Changing this name will also change the path for the VM's disk image:
-  #    image_path = image_directory + "/" + vm_name
-  #
-  # @yieldparam [String] name the name of the VM 
-  #
-  configure :vm_name do |res, name|
-    res.property.image_path = "#{res.property.image_directory}/#{name}"
-    res.property.vm_name = name
-    logger.info "VM name was set to #{name}"
-    res.property.vm_name
-  end
-
-  # Configure the directory for the disk image of the VM associated to this 
-  # VM Proxy.
-  # Changing this directory will also change the path for the VM's disk image:
-  #    image_path = image_directory + "/" + vm_name
-  #
-  # @yieldparam [String] name the name of the directory 
-  #
-  configure :image_directory do |res, name|
-    res.property.image_path = "#{name}/#{res.property.vm_name}"
-    res.property.image_directory = name
   end
 
   # Configure the next action to execute for this VM Proxy.
@@ -346,12 +365,13 @@ module OmfRc::ResourceProxy::VirtualMachine
     vm_state = res.check_state_vm(res)
 
     if vm_state.include? "Domain not found"
+      res.set_broker_info({:status => BROKER_STATUS_CREATING})
       result = res.send("build_img_with_#{res.property.img_builder}")
       res.property.vm_topic = result
 
       # ----Setting up broker vm info ----
       is_created = !(res.property.vm_topic.include? "error:")
-      status = is_created ? 'BOOTING' : 'CREATION_ERROR'
+      status = is_created ? BROKER_STATUS_BOOTING : BROKER_STATUS_CREATION_ERROR
       broker_info = {
           :status => status
       }
@@ -360,29 +380,15 @@ module OmfRc::ResourceProxy::VirtualMachine
       end
 
       res.set_broker_info(broker_info)
-      res.inform(:vm_state, status)
-      # ---- end broker integration ----
 
-      res.inform(:status, {vm_topic: "#{res.property.vm_topic}"})
+      vm_state = {:state => status}
+      vm_state[:vm_topic] = "#{res.property.vm_topic}" unless !is_created
+      res.inform(:vm_state, Hashie::Mash.new(vm_state))
+      # ---- end broker integration ----
     else
       res.log_inform_error "Cannot build VM image: it is not stopped"+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state} "+
         "- path: '#{res.property.image_path}')"
-    end
-  end
-
-  configure_all do |res, conf_props, conf_result|
-    conf_props.each { |k, v| conf_result[k] = res.__send__("configure_#{k}", v) }
-  end
-
-  work :set_broker_info do |resource, broker_info|
-    unless @vm_topic.nil?
-      debug "Sending broker VM info: '#{broker_info}'"
-      @vm_topic.configure(broker_info) do |msg|
-        if msg.error?
-          raise "Could not set broker info: #{msg}"
-        end
-      end
     end
   end
 
@@ -443,17 +449,20 @@ module OmfRc::ResourceProxy::VirtualMachine
     vm_state = res.check_state_vm(res)
 
     if vm_state == "running"
+      res.set_broker_info({:status => BROKER_STATUS_SHOOTING_DOWN})
       res.send("stop_vm_with_#{res.property.virt_mngt}")
     else
       res.log_inform_warn "Cannot stop VM: it is not running "+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
     end
+    res.set_broker_info({:status => BROKER_STATUS_DOWN})
   end
 
   work :run_vm do |res|
     vm_state = res.check_state_vm(res)
 
     if vm_state == "shut off"
+      res.set_broker_info({:status => BROKER_STATUS_BOOTING})
       res.send("run_vm_with_#{res.property.virt_mngt}")
     else
       res.log_inform_warn "Cannot run VM: it is not stopped or ready yet "+
@@ -479,4 +488,45 @@ module OmfRc::ResourceProxy::VirtualMachine
     result
   end
 
+  work :get_vm_opts do |resource|
+    info "Getting vm options from broker..."
+    @vm_topic.request([:ram, :cpu, :disk_image]) do |msg|
+      if msg.error?
+        resource.inform_error("Could not finish vm setup with broker: #{msg}")
+      else
+        resource.property.vm_opts = {} unless resource.property.vm_opts.kind_of? Hash
+        resource.property.vm_opts[:ram] = msg[:ram]
+        resource.property.vm_opts[:cpu] = msg[:cpu]
+        resource.property.vm_opts[:disk] = {
+            :image => msg[:disk_image]
+        }
+
+        debug "VM options got: #{resource.property.vm_opts}"
+        @started = true
+
+        # Call each configure called before started
+        prev_configure_len = @configure_list_opts.size
+        if prev_configure_len > 0
+          info_msg = "Executing previous '#{prev_configure_len}' configures called..."
+          resource.inform(:info, Hashie::Mash.new({:info => info_msg}))
+          @configure_list_opts.each do |obj|
+            debug "Calling previous called configure: #{obj}"
+            resource.configure_all(obj[:conf_props], obj[:conf_result])
+          end
+          @configure_list_opts = []
+        end
+      end
+    end
+  end
+
+  work :set_broker_info do |resource, broker_info|
+    unless @vm_topic.nil?
+      debug "Sending broker VM info: '#{broker_info}'"
+      @vm_topic.configure(broker_info) do |msg|
+        if msg.error?
+          resource.log_inform_error("Could not set broker info: #{msg}")
+        end
+      end
+    end
+  end
 end

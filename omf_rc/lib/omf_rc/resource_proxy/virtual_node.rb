@@ -18,23 +18,27 @@ module OmfRc::ResourceProxy::VirtualNode
     debug "Subscribing to broker topic: #{resource.property.broker_topic_name}"
     OmfCommon.comm.subscribe(resource.property.broker_topic_name) do |topic|
       if topic.error?
-        raise "Could not subscribe to broker topic"
-      end
-      @broker_topic = topic
+        resource.inform_error("Could not subscribe to broker topic")
+      else
+        @broker_topic = topic
+        debug "Creating broker virtual machine resource with mac_address: #{resource.uid}"
+        @broker_topic.create(:virtual_machine, {:mac_address => resource.uid}) do |msg|
+          if msg.error?
+            resource.inform_error("Could not create broker virtual machine resource topic")
+          else
+            debug "Broker virtual machine resource created successfully!"
+            @vm_topic = msg.resource
+            Thread.new {
+              info_msg = 'Waiting 30 seconds to finalize VM setup with broker...'
+              resource.inform(:info, Hashie::Mash.new({:info => info_msg}))
+              info info_msg
 
-      debug "Creating broker virtual machine resource with mac_address: #{resource.uid}"
-      @broker_topic.create(:virtual_machine, {:mac_address => resource.uid}) do |msg|
-        if msg.error?
-          raise "Could not create broker virtual machine resource topic"
+              sleep(30)
+              resource.finish_vm_setup_with_broker
+              resource.configure_broker_vm
+            }
+          end
         end
-        debug "Broker virtual machine resource created successfully!"
-        @vm_topic = msg.resource
-        Thread.new {
-          info 'Waiting 30 seconds to finalize VM setup with broker...'
-          sleep(30)
-          resource.finish_vm_setup_with_broker
-          resource.configure_broker_vm
-        }
       end
     end
   end
@@ -108,10 +112,12 @@ module OmfRc::ResourceProxy::VirtualNode
       ip_address = resource.request_vm_ip
       status = 'UP_AND_READY'
 
-      info "Setting vm status on broker to  and ip address to '#{ip_address}'"
+      info "Setting vm status on broker to '#{status}' and ip address to '#{ip_address}'"
       @vm_topic.configure(status: status, ip_address: ip_address) do |msg|
         if msg.error?
-          raise "Could not finish vm setup with broker: #{msg}"
+          resource.inform_error("Could not finish vm setup with broker: #{msg}")
+        else
+          resource.inform(:boot, Hashie::Mash.new({:status => status, ip_address: ip_address}))
         end
       end
     end

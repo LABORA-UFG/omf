@@ -111,7 +111,6 @@ module OmfRc::Util::Fibre
 
   work :delete_vm_with_fibre do |res|
     result = res.delete_vm_with_libvirt
-
     res.remove_image(res.property.image_name)
   end
 
@@ -124,31 +123,38 @@ module OmfRc::Util::Fibre
 
     logger.info "Creating VM image..."
 
-    #Start image copying
-    Thread.new {
-      cmd = "cp #{template_img_fullname} #{image_name}"
-      res.ssh_command(user, ip_address, port, key_file, cmd)
-    }
+    logger.info "Checking if image exists..."
+    cmd = "ssh -l #{user} #{ip_address} -p #{port} -i #{key_file} [ -f #{template_img_fullname} ] && echo 'found' || echo 'not found'"
+    file_exists = `#{cmd}`
+    if file_exists.include? "not found"
+      res.inform_error("The template image '#{template_img_fullname}' does not exists.")
+    else
+      #Start image copying
+      Thread.new {
+        cmd = "cp #{template_img_fullname} #{image_name}"
+        res.ssh_command(user, ip_address, port, key_file, cmd)
+      }
 
-    #Get the size of the template image to calc the copy progress
-    cmd = "ssh -l #{user} #{ip_address} -p #{port} -i #{key_file} du #{template_img_fullname}"
+      #Get the size of the template image to calc the copy progress
+      cmd = "ssh -l #{user} #{ip_address} -p #{port} -i #{key_file} du #{template_img_fullname}"
 
-    template_size = `#{cmd}`
-    template_size = template_size.split(" ")[0].to_i
+      template_size = `#{cmd}`
+      template_size = template_size.split(" ")[0].to_i
 
-    progress = 0
+      progress = 0
 
-    #Calculate and inform the copy progress
-    while progress != 100.0 do
-      sleep 5
-      cmd = "ssh -l #{user} #{ip_address} -p #{port} -i #{key_file} du #{image_name}"
-      copy_size = `#{cmd}`
-      copy_size = copy_size.split(" ")[0].to_i
-      progress = (copy_size.to_f/template_size).round(2) * 100
-      res.inform(:status, {progress: "#{"%.0f" % progress}%"})
+      #Calculate and inform the copy progress
+      while progress != 100.0 do
+        sleep 5
+        cmd = "ssh -l #{user} #{ip_address} -p #{port} -i #{key_file} du #{image_name}"
+        copy_size = `#{cmd}`
+        copy_size = copy_size.split(" ")[0].to_i
+        progress = (copy_size.to_f/template_size).round(2) * 100
+        res.inform(:status, {progress: "#{"%.0f" % progress}%"})
+      end
+
+      progress.to_s
     end
-
-    progress.to_s
   end
 
   work :remove_image do |res, image_name|

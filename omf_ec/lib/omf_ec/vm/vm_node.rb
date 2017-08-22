@@ -14,6 +14,11 @@ module OmfEc::Vm
     attr_accessor :id, :topic_name
     attr_reader :topic, :vm
 
+    BOOT_INITIALIZED = 'BOOT.INITIALIZED'
+    BOOT_DONE = 'BOOT.DONE'
+    VM_TOPIC = 'VM.TOPIC'
+    BOOT_TIMEOUT = 'BOOT.TIMEOUT'
+
     # @param [String] name of the vm node.
     def initialize(name, vm)
       super()

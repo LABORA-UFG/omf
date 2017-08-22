@@ -9,18 +9,10 @@ VM_TEMPLATE = "vm-template.img"
 defVmGroup('hyp-name', SWITCH_TOPIC) do |vmg|
   vmg.addVm('vm-8') do |vm1|
     # configure - build
-    vm1.ram = 1024
-    vm1.cpu = 1
     vm1.bridges = ['xenbr0', 'br1']
-    vm1.image = VM_TEMPLATE
     # configure - host
     vm1.hostname = "labora-host"
-
-    # USER
-    # vm1.addUser("username", "password")
-    # vm1.addUser("bruno", "54321")
-
-    # VLAN
+    # configure - vlan
     # vm1.addVlan(vlan_id, "interface")
     # vm1.addVlan(195, "eth1")
   end

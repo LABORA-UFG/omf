@@ -55,10 +55,10 @@ module OmfEc::Vm
 
     # Create a new virtual machine in the hypervisor and receive the topic to manage it.
     # @return [vm_topic] topic to manage the virtual machine.
-    def create_vm(&block)
+    def create_vm(name, &block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.has_topic
       # self.synchronize do
-      topic.create(:virtual_machine) do |vm|
+      @topic.create(:virtual_machine, {:label => name}) do |vm|
         vm_topic = vm.resource
         if vm_topic.error?
           error app.inspect

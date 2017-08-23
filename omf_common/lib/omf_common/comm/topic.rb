@@ -75,7 +75,8 @@ module OmfCommon
 
       # Only used for create, configure and request
       def create_message_and_publish(type, props = {}, core_props = {}, block = nil)
-        debug "(#{id}) create_message_and_publish '#{type}': #{props.to_s}: #{core_props.to_s}"
+        # debug "(#{id}) create_message_and_publish '#{type}': #{props.to_s}: #{core_props.to_s}"
+        debug "(#{id}) create_message_and_publish '#{type}'"
         core_props[:src] ||= OmfCommon.comm.local_address
         msg = OmfCommon::Message.create(type, props, core_props)
         publish(msg, { routing_key: "o.op" }, &block)
@@ -160,7 +161,8 @@ module OmfCommon
       def _send_message(msg, opts = {}, block = nil)
         if (block)
           # register callback for responses to 'mid'
-          debug "(#{id}) register callback for responses to 'mid: #{msg.mid}'"
+          # debug "(#{id}) register callback for responses to 'mid: #{msg.mid}'"
+          debug "(#{id}) register callback for responses"
           @lock.synchronize do
             @context2cbk[msg.mid.to_s] = { block: block, created_at: Time.now }
           end
@@ -173,7 +175,8 @@ module OmfCommon
       #
       def on_incoming_message(msg)
         type = msg.operation
-        debug "(#{id}) Deliver message '#{type}': #{msg.to_s}"
+        # debug "(#{id}) Deliver message '#{type}': #{msg.to_s}"
+        debug "(#{id}) Deliver message '#{type}'"
         htypes = [type, :message]
         if type == :inform
           # TODO keep converting itype is painful, need to solve this.
@@ -189,14 +192,17 @@ module OmfCommon
           end
         end
 
-        debug "(#{id}) Message type '#{htypes.inspect}' (#{msg.class}:#{msg.cid})"
+        # debug "(#{id}) Message type '#{htypes.inspect}' (#{msg.class}:#{msg.cid})"
+        debug "(#{id}) Message type '#{htypes.inspect}'"
         hs = htypes.map { |ht| (@handlers[ht] || {}).values }.compact.flatten
-        debug "(#{id}) Distributing message to '#{hs.inspect}'"
+        # debug "(#{id}) Distributing message to '#{hs.inspect}'"
+        debug "(#{id}) Distributing message"
         hs.each do |block|
           block.call msg
         end
         if cbk = @context2cbk[msg.cid.to_s]
-          debug "(#{id}) Distributing message to '#{cbk.inspect}'"
+          # debug "(#{id}) Distributing message to '#{cbk.inspect}'"
+          debug "(#{id}) Distributing message"
           cbk[:last_used] = Time.now
           cbk[:block].call(msg)
         end

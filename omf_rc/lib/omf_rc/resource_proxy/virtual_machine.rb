@@ -378,13 +378,15 @@ module OmfRc::ResourceProxy::VirtualMachine
       if is_created
         broker_info[:mac_address] = res.property.vm_topic
       end
-
       res.set_broker_info(broker_info)
-
-      vm_state = {:state => status}
-      vm_state[:vm_topic] = "#{res.property.vm_topic}" unless !is_created
-      res.inform(:vm_state, Hashie::Mash.new(vm_state))
       # ---- end broker integration ----
+      res.start_booting_monitor(res.property.vm_topic)
+
+      if is_created
+        res.inform(:VM_TOPIC, Hashie::Mash.new({:vm_topic => "#{res.property.vm_topic}"}))
+      else
+        res.log_inform_error "Could not build VM: #{result}"
+      end
     else
       res.log_inform_error "Cannot build VM image: it is not stopped"+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state} "+
@@ -464,6 +466,10 @@ module OmfRc::ResourceProxy::VirtualMachine
     if vm_state == "shut off"
       res.set_broker_info({:status => BROKER_STATUS_BOOTING})
       res.send("run_vm_with_#{res.property.virt_mngt}")
+
+      # Start boot monitoring
+      vm_topic = res.get_mac_addr(res.property.vm_name)
+      res.start_booting_monitor(vm_topic)
     else
       res.log_inform_warn "Cannot run VM: it is not stopped or ready yet "+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
@@ -484,7 +490,6 @@ module OmfRc::ResourceProxy::VirtualMachine
 
   work :check_state_vm do |res|
     result = res.send("check_vm_state_with_#{res.property.virt_mngt}")
-    #res.inform(:state, Hashie::Mash.new({:state => result}))
     result
   end
 
@@ -505,16 +510,7 @@ module OmfRc::ResourceProxy::VirtualMachine
         @started = true
 
         # Call each configure called before started
-        prev_configure_len = @configure_list_opts.size
-        if prev_configure_len > 0
-          info_msg = "Executing previous '#{prev_configure_len}' configures called..."
-          resource.inform(:info, Hashie::Mash.new({:info => info_msg}))
-          @configure_list_opts.each do |obj|
-            debug "Calling previous called configure: #{obj}"
-            resource.configure_all(obj[:conf_props], obj[:conf_result])
-          end
-          @configure_list_opts = []
-        end
+        resource.call_prev_configures
       end
     end
   end
@@ -528,5 +524,48 @@ module OmfRc::ResourceProxy::VirtualMachine
         end
       end
     end
+  end
+
+  work :call_prev_configures do |resource|
+    prev_configure_len = @configure_list_opts.size
+    if prev_configure_len > 0
+      info_msg = "Executing previous '#{prev_configure_len}' configures called..."
+      resource.inform(:info, Hashie::Mash.new({:info => info_msg}))
+      @configure_list_opts.each do |obj|
+        debug "Calling previous called configure: #{obj}"
+        resource.configure_all(obj[:conf_props], obj[:conf_result])
+      end
+      @configure_list_opts = []
+    end
+  end
+
+  work :start_booting_monitor do |resource, vm_topic|
+    Thread.new {
+      debug "Starting booting monitoring to VM '#{vm_topic}'. Timeout set to #{resource.property.boot_timeout} seconds."
+
+      started = false
+      OmfCommon.comm.subscribe(vm_topic) do |topic|
+        if topic.error?
+          error = "Could not subscribe to broker topic"
+          resource.log_inform_error(error)
+        else
+          topic.on_message do |msg|
+            if msg.itype == 'BOOT.INITIALIZED'
+              started = true
+            end
+          end
+        end
+      end
+
+      sleep resource.property.boot_timeout
+      unless started
+        resource.inform(:BOOT_TIMEOUT, Hashie::Mash.new({:timeout => resource.property.boot_timeout}))
+        begin
+          resource.stop_vm
+        rescue => e
+          error "Could not stop vm"
+        end
+      end
+    }
   end
 end

@@ -13,8 +13,12 @@ module OmfRc::ResourceProxy::VirtualNode
 
   @broker_topic = nil
   @vm_topic = nil
+  @started = false
+  @configure_list_opts = []
 
   hook :before_ready do |resource|
+    resource.inform(:BOOT_INITIALIZED, Hashie::Mash.new({:info => 'Virtual Machine successfully initialized.'}))
+
     debug "Subscribing to broker topic: #{resource.property.broker_topic_name}"
     OmfCommon.comm.subscribe(resource.property.broker_topic_name) do |topic|
       if topic.error?
@@ -45,12 +49,31 @@ module OmfRc::ResourceProxy::VirtualNode
 
   request :vm_ip do |resource|
     cmd = "/sbin/ifconfig #{resource.property.if_name} | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1"
-    resource.execute_cmd(cmd, "Getting the ip of #{resource.property.if_name}",
+    ip = resource.execute_cmd(cmd, "Getting the ip of #{resource.property.if_name}",
                     "It was not possible to get the IP!", "IP was successfully got!")
+    resource.check_and_return_request(ip)
   end
 
   request :vm_mac do |resource|
-    resource.uid
+    resource.check_and_return_request(resource.uid)
+  end
+
+  # Checks if resource is ready to receive configure commands
+  configure_all do |resource, conf_props, conf_result|
+    if @started && @vm_topic.nil?
+      raise "This virtual machine '#{resource.property.label}' is not avaiable, so nothing can be configured"
+    end
+
+    if @started
+      conf_props.each { |k, v| conf_result[k] = resource.__send__("configure_#{k}", v) }
+    else
+      configure_call = {
+          :conf_props => conf_props,
+          :conf_result => conf_result
+      }
+      debug "Resource not started yet, saving configure call: #{configure_call}..."
+      @configure_list_opts << configure_call
+    end
   end
 
   configure :hostname do |res, value|
@@ -58,9 +81,8 @@ module OmfRc::ResourceProxy::VirtualNode
   end
 
   configure :vlan do |res, opts|
-    data = opts[0]
-    interface = data[:interface]
-    vlan_id = data[:vlan_id]
+    interface = opts[:interface]
+    vlan_id = opts[:vlan_id]
 
     open('/etc/network/interfaces', 'a') { |f|
       f << "\n"
@@ -109,6 +131,7 @@ module OmfRc::ResourceProxy::VirtualNode
 
   work :configure_broker_vm do |resource|
     unless @vm_topic.nil?
+      @started = true
       ip_address = resource.request_vm_ip
       status = 'UP_AND_READY'
 
@@ -117,9 +140,33 @@ module OmfRc::ResourceProxy::VirtualNode
         if msg.error?
           resource.inform_error("Could not finish vm setup with broker: #{msg}")
         else
-          resource.inform(:boot, Hashie::Mash.new({:status => status, ip_address: ip_address}))
+          resource.inform(:BOOT_DONE, Hashie::Mash.new({:status => status, ip_address: ip_address}))
+          resource.call_prev_configs
         end
       end
+    end
+  end
+
+  work :check_and_return_request do |resource, return_data|
+    if @started
+      return_data
+    else
+      resource.inform_error("This resource is not ready yet")
+      ""
+    end
+  end
+
+  # Call each configure called before started
+  work :call_prev_configs do |resource|
+    prev_configure_len = @configure_list_opts.size
+    if prev_configure_len > 0
+      info_msg = "Executing previous '#{prev_configure_len}' configures called..."
+      resource.inform(:info, Hashie::Mash.new({:info => info_msg}))
+      @configure_list_opts.each do |obj|
+        debug "Calling previous called configure: #{obj}"
+        resource.configure_all(obj[:conf_props], obj[:conf_result])
+      end
+      @configure_list_opts = []
     end
   end
 end

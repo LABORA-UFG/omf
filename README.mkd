@@ -1,6 +1,6 @@
 # OMF
 
-[![Build Status](http://img.shields.io/travis/mytestbed/omf.svg?style=flat)](http://travis-ci.org/mytestbed/omf)
+[![Build Status](https://travis-ci.org/LABORA-UFG/omf.svg?branch=amqp)](https://travis-ci.org/LABORA-UFG/omf)
 ![Gem Version](http://img.shields.io/gem/v/omf_common.svg?style=flat)
 
 ## Note

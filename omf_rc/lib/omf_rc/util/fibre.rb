@@ -150,7 +150,7 @@ module OmfRc::Util::Fibre
         copy_size = `#{cmd}`
         copy_size = copy_size.split(" ")[0].to_i
         progress = (copy_size.to_f/template_size).round(2) * 100
-        res.inform(:status, {progress: "#{"%.0f" % progress}%"})
+        res.inform(:CREATION_PROGRESS, {progress: "#{"%.0f" % progress}%"})
       end
 
       progress.to_s

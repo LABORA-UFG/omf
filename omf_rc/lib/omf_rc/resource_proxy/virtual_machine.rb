@@ -380,9 +380,9 @@ module OmfRc::ResourceProxy::VirtualMachine
       end
       res.set_broker_info(broker_info)
       # ---- end broker integration ----
-      res.start_booting_monitor(res.property.vm_topic)
 
       if is_created
+        res.start_booting_monitor(res.property.vm_topic)
         res.inform(:VM_TOPIC, Hashie::Mash.new({:vm_topic => "#{res.property.vm_topic}"}))
       else
         res.log_inform_error "Could not build VM: #{result}"
@@ -540,32 +540,35 @@ module OmfRc::ResourceProxy::VirtualMachine
   end
 
   work :start_booting_monitor do |resource, vm_topic|
-    Thread.new {
-      debug "Starting booting monitoring to VM '#{vm_topic}'. Timeout set to #{resource.property.boot_timeout} seconds."
+    if @started
+      Thread.new {
+        debug "Starting booting monitoring to VM '#{vm_topic}'. Timeout set to #{resource.property.boot_timeout} " +
+                  "seconds."
 
-      started = false
-      OmfCommon.comm.subscribe(vm_topic) do |topic|
-        if topic.error?
-          error = "Could not subscribe to broker topic"
-          resource.log_inform_error(error)
-        else
-          topic.on_message do |msg|
-            if msg.itype == 'BOOT.INITIALIZED'
-              started = true
+        started = false
+        OmfCommon.comm.subscribe(vm_topic) do |topic|
+          if topic.error?
+            error = "Could not subscribe to broker topic"
+            resource.log_inform_error(error)
+          else
+            topic.on_message do |msg|
+              if msg.itype == 'BOOT.INITIALIZED' || msg.itype == 'BOOT.DONE'
+                started = true
+              end
             end
           end
         end
-      end
 
-      sleep resource.property.boot_timeout
-      unless started
-        resource.inform(:BOOT_TIMEOUT, Hashie::Mash.new({:timeout => resource.property.boot_timeout}))
-        begin
-          resource.stop_vm
-        rescue => e
-          error "Could not stop vm"
+        sleep resource.property.boot_timeout
+        unless started
+          resource.inform(:BOOT_TIMEOUT, Hashie::Mash.new({:timeout => resource.property.boot_timeout}))
+          begin
+            resource.stop_vm
+          rescue => e
+            error "Could not stop vm"
+          end
         end
-      end
-    }
+      }
+    end
   end
 end

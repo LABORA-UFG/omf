@@ -58,7 +58,7 @@ module OmfRc::ResourceProxy::Hipervisor
   property :image_directory, :default => VM_DIR_DEFAULT
   property :image_path, :default => VM_DIR_DEFAULT
   property :broker_topic_name, :default => "am_controller"
-  property :boot_timeout, :default => 60
+  property :boot_timeout, :default => 150
 
   # Properties to run ssh command
   property :ssh_params, :default => {

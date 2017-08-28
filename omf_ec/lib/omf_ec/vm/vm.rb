@@ -68,45 +68,47 @@ module OmfEc::Vm
     def recv_vm_topic(&block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.vm_group.has_topic
       if self.has_topic
-        if block
-          block.call
-        else
-          return nil
+        block ? block.call : nil
+      else
+        info "request the vm_group topic"
+        @vm_group.create_vm(@name) do |vm_topic|
+          @vm_topic = vm_topic
+          block.call if block
         end
-      end
-      @vm_group.create_vm(@name) do |vm_topic|
-        @vm_topic = vm_topic
-        block.call if block
       end
     end
 
     #
     def create(&block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.vm_group.has_topic
+      info "create the vm in hypervisor"
       # create the vm in hypervisor
       self.recv_vm_topic do
         opts = {bridges: self.bridges}
         # build the VM
+        info "build the vm"
         @vm_topic.configure(vm_opts: opts, action: :build) do |build_msg|
+          info "vm_topic builded"
           if build_msg.success?
+            info "build susccess"
             # wait receive the message of creation of the VM
             @vm_topic.on_message do |msg|
-              if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:progress]
+              if msg.itype == "CREATION.PROGRESS"
                 info "vm: #{@name} progress #{msg.properties[:progress]}"
-              elsif msg.itype == OmfEc::Vm::VmNode.VM_TOPIC
+              elsif msg.itype == 'VM.TOPIC'
                 @vm_node.subscribe(msg.properties[:vm_topic]) do
-                  @vm_node.topic.on_message do |vm_instance_msg|
-                    if vm_instance_msg.itype == OmfEc::Vm::VmNode.BOOT_INITIALIZED
+                  @vm_node.topic.on_message do |vm_node_msg|
+                    if vm_node_msg.itype == 'BOOT.INITIALIZED'
                       info "vm: #{@name} boot initialized"
                     end
-                    if vm_instance_msg.itype == OmfEc::Vm::VmNode.BOOT_DONE
+                    if vm_node_msg.itype == 'BOOT.DONE'
                       info "vm: #{@name} boot done"
                       self.configure_params
                       block.call if block
                     end
                   end
                 end
-              elsif msg.itype == OmfEc::Vm::VmNode.BOOT_TIMEOUT
+              elsif msg.itype == 'BOOT.TIMEOUT'
                 info "vm: #{@name} not initialized, timeout of #{msg.properties[:timeout]} seconds."
               elsif msg.itype == "ERROR" and msg.has_properties? and msg.properties[:reason]
                 info "#{@name} ERROR = #{msg.properties[:reason]}"

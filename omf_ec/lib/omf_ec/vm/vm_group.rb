@@ -35,6 +35,9 @@ module OmfEc::Vm
     def associate_topic(topic)
       self.synchronize do
         @topic = topic
+        @topic.on_message do |msg|
+          info msg
+        end
       end
     end
 

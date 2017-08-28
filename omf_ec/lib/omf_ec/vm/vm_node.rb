@@ -14,11 +14,6 @@ module OmfEc::Vm
     attr_accessor :id, :topic_name
     attr_reader :topic, :vm
 
-    BOOT_INITIALIZED = 'BOOT.INITIALIZED'
-    BOOT_DONE = 'BOOT.DONE'
-    VM_TOPIC = 'VM.TOPIC'
-    BOOT_TIMEOUT = 'BOOT.TIMEOUT'
-
     # @param [String] name of the vm node.
     def initialize(name, vm)
       super()
@@ -30,8 +25,8 @@ module OmfEc::Vm
     end
 
     def subscribe(topic_name, &block)
-      self.topic_name = topic_name
-      OmfEc.subscribe_topic(topic_name, self, &block)
+      @topic_name = topic_name
+      OmfEc.subscribe_topic(@topic_name, self, &block)
     end
 
     # Verify if has a topic associated with this class, used to trigger the event :ALL_VM_GROUPS_UP.

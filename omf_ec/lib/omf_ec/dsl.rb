@@ -114,8 +114,7 @@ module OmfEc
     def vm_group(name, &block)
       vm_group = OmfEc.experiment.vm_group(name)
       raise RuntimeError, "VmGroup '#{name}' not found" if vm_group.nil?
-      block.call(vm_group) if block
-      vm_group
+      block ? block.call(vm_group) : vm_group
     end
 
     # Get a FlowVisor instance
@@ -124,8 +123,7 @@ module OmfEc
     def flowvisor(name, &block)
       flowvisor = OmfEc.experiment.flowvisor(name)
       raise RuntimeError, "Flowvisor '#{name}' not found" if flowvisor.nil?
-      block.call(flowvisor) if block
-      flowvisor
+      block ? block.call(flowvisor) : flowvisor
     end
 
     # Define a group, create a pubsub topic for the group

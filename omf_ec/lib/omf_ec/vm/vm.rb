@@ -16,8 +16,6 @@ module OmfEc::Vm
     attr_reader :vm_topic, :vm_node
     attr_reader :conf_params, :vlans, :users, :req_params, :params
 
-    TIME_TO_VM_RUN = 58
-
     # @param [String] name name of virtual machine
     def initialize(name, vm_group, &block)
       super()
@@ -32,8 +30,8 @@ module OmfEc::Vm
 
       # configure the parameters when there is a topic and the state of vm is running
       @params = {}
-      @conf_params = %w(hostname if_name)
-      @req_params = %w(ip mac state)
+      @conf_params = %w(hostname)
+      @req_params = %w(ip mac)
       @vlans = []
       @users = []
     end
@@ -70,16 +68,11 @@ module OmfEc::Vm
     def recv_vm_topic(&block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.vm_group.has_topic
       if self.has_topic
-        if block
-          block.call
-        else
-          return nil
-        end
-      end
-      @vm_group.create_vm do |vm_topic|
-        @vm_topic = vm_topic
-        @vm_topic.configure(vm_name: self.name) do |vm_name|
-          info "recv_vm_topic::configure::vm_name: #{vm_name}" # TODO
+        block ? block.call : nil
+      else
+        info "request the vm_group topic"
+        @vm_group.create_vm(@name) do |vm_topic|
+          @vm_topic = vm_topic
           block.call if block
         end
       end
@@ -88,21 +81,37 @@ module OmfEc::Vm
     #
     def create(&block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.vm_group.has_topic
+      info "create the vm in hypervisor"
       # create the vm in hypervisor
       self.recv_vm_topic do
-        opts = {ram: self.ram, cpu: self.cpu, bridges: self.bridges, disk: {image: self.image}}
+        opts = {bridges: self.bridges}
         # build the VM
+        info "build the vm"
         @vm_topic.configure(vm_opts: opts, action: :build) do |build_msg|
+          info "vm_topic builded"
           if build_msg.success?
+            info "build susccess"
             # wait receive the message of creation of the VM
             @vm_topic.on_message do |msg|
-              if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:vm_topic]
-                sleep(TIME_TO_VM_RUN)
+              if msg.itype == "CREATION.PROGRESS"
+                info "vm: #{@name} progress #{msg.properties[:progress]}"
+              elsif msg.itype == 'VM.TOPIC'
                 @vm_node.subscribe(msg.properties[:vm_topic]) do
-                  # after created configure the host parameters
-                  self.configure_params
-                  block.call if block
+                  @vm_node.topic.on_message do |vm_node_msg|
+                    if vm_node_msg.itype == 'BOOT.INITIALIZED'
+                      info "vm: #{@name} boot initialized"
+                    end
+                    if vm_node_msg.itype == 'BOOT.DONE'
+                      info "vm: #{@name} boot done"
+                      self.configure_params
+                      block.call if block
+                    end
+                  end
                 end
+              elsif msg.itype == 'BOOT.TIMEOUT'
+                info "vm: #{@name} not initialized, timeout of #{msg.properties[:timeout]} seconds."
+              elsif msg.itype == "ERROR" and msg.has_properties? and msg.properties[:reason]
+                info "#{@name} ERROR = #{msg.properties[:reason]}"
               end
             end
             # start listen messages of VM
@@ -163,9 +172,6 @@ module OmfEc::Vm
     def listen_messages
       raise('This function can only be executed when there is a topic') unless self.vm_topic
       @vm_topic.on_message do |msg|
-        # if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:vm_topic]
-        #   # info 'listen_messages::receive_vm_topic'
-        # end
         if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:progress]
           info "#{@name} progress: #{msg.properties[:progress]}"
         elsif msg.itype == "ERROR" and msg.has_properties? and msg.properties[:reason]
@@ -193,13 +199,8 @@ module OmfEc::Vm
           debug "configure_params::param: #{vm_param}" # TODO
         end
       end
-      @users.each do |user|
-        topic.configure(user: [{username: user[:username], password: user[:password]}]) do |vm_user|
-          debug "configure_params::user: #{vm_user}" # TODO
-        end
-      end
       @vlans.each do |vlan|
-        topic.configure(vlan: [{interface: vlan[:interface], vlan_id: vlan[:vlan_id]}]) do |vm_vlan|
+        topic.configure(vlan: {interface: vlan[:interface], vlan_id: vlan[:vlan_id]}) do |vm_vlan|
           debug "configure_params::vlan: #{vm_vlan}" # TODO
         end
       end

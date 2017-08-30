@@ -123,13 +123,23 @@ module OmfEc
             # Vm
             def all_vms_created?(state)
               all_vms? do |vm|
-                vm.has_vm_node_topic
+                vm.vm_state_up
               end
             end
 
             def_event :ALL_VMS_CREATED do |state|
               all_vms_created?(state)
             end
+
+            # def all_vms_up?(state)
+            #   all_vms? do |vm|
+            #     vm.vm_state_up
+            #   end
+            # end
+            #
+            # def_event :ALL_VMS_UP do |state|
+            #   all_vms_up?(state)
+            # end
 
             # FlowVisor
             def all_flowvisor_created?(state)

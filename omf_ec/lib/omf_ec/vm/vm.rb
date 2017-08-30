@@ -14,7 +14,7 @@ module OmfEc::Vm
     attr_accessor :id, :name, :vm_group
     attr_accessor :ram, :cpu, :bridges, :image
     attr_reader :vm_topic, :vm_node
-    attr_reader :conf_params, :vlans, :users, :req_params, :params
+    attr_reader :conf_params, :vlans, :users, :req_params, :params, :vm_state_up
 
     # @param [String] name name of virtual machine
     def initialize(name, vm_group, &block)
@@ -23,7 +23,7 @@ module OmfEc::Vm
         raise ArgumentError, "Expect VmGroup object, got #{vm_group.inspect}"
       end
       #
-      @id = "#{OmfEc.experiment.id}.#{self.name}"
+      @id = "#{OmfEc.experiment.id}.#{@name}"
       @name = name
       @vm_group = vm_group
       @vm_node = OmfEc::Vm::VmNode.new(name, self)
@@ -32,6 +32,7 @@ module OmfEc::Vm
       @params = {}
       @conf_params = %w(hostname)
       @req_params = %w(ip mac)
+      @vm_state_up = false
       @vlans = []
       @users = []
     end
@@ -60,7 +61,7 @@ module OmfEc::Vm
     # @param [String] interface
     def addVlan(vlan_id, interface)
       self.synchronize do
-        @vlans << {vlan_id: vlan_id, interface: interface}
+        @vlans << {vlan_id: vlan_id.to_s, interface: interface}
       end
     end
 
@@ -70,7 +71,6 @@ module OmfEc::Vm
       if self.has_topic
         block ? block.call : nil
       else
-        info "request the vm_group topic"
         @vm_group.create_vm(@name) do |vm_topic|
           @vm_topic = vm_topic
           block.call if block
@@ -81,17 +81,13 @@ module OmfEc::Vm
     #
     def create(&block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.vm_group.has_topic
-      info "create the vm in hypervisor"
       # create the vm in hypervisor
       self.recv_vm_topic do
         opts = {bridges: self.bridges}
         # build the VM
-        info "build the vm"
         @vm_topic.configure(vm_opts: opts, action: :build) do |build_msg|
-          info "vm_topic builded"
           if build_msg.success?
-            info "build susccess"
-            # wait receive the message of creation of the VM
+            info "vm: #{@name} - wait receive the message of creation and boot (initialized and done)"
             @vm_topic.on_message do |msg|
               if msg.itype == "CREATION.PROGRESS"
                 info "vm: #{@name} progress #{msg.properties[:progress]}"
@@ -99,10 +95,11 @@ module OmfEc::Vm
                 @vm_node.subscribe(msg.properties[:vm_topic]) do
                   @vm_node.topic.on_message do |vm_node_msg|
                     if vm_node_msg.itype == 'BOOT.INITIALIZED'
-                      info "vm: #{@name} boot initialized"
+                      info "vm: #{@name} boot initialized."
                     end
                     if vm_node_msg.itype == 'BOOT.DONE'
-                      info "vm: #{@name} boot done"
+                      info "vm: #{@name} boot done."
+                      @vm_state_up = true
                       self.configure_params
                       block.call if block
                     end
@@ -114,10 +111,8 @@ module OmfEc::Vm
                 info "#{@name} ERROR = #{msg.properties[:reason]}"
               end
             end
-            # start listen messages of VM
-            listen_messages
           else
-            info "Could not create the VM: #{self.name}"
+            info "Could not create the vm: #{@name}"
           end
         end
       end
@@ -165,19 +160,6 @@ module OmfEc::Vm
     def state
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.has_topic
       warn 'This function is not implemented'
-    end
-
-    # Calling standard methods or assignments will simply trigger sending a FRCP message
-    #
-    def listen_messages
-      raise('This function can only be executed when there is a topic') unless self.vm_topic
-      @vm_topic.on_message do |msg|
-        if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:progress]
-          info "#{@name} progress: #{msg.properties[:progress]}"
-        elsif msg.itype == "ERROR" and msg.has_properties? and msg.properties[:reason]
-          info "#{@name} ERROR = #{msg.properties[:reason]}"
-        end
-      end
     end
 
     # Configure the parameters.

@@ -244,16 +244,23 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :broker_topic_name
   property :vm_opts, :default => {}
 
-  @broker_topic = nil
-  @vm_topic = nil
-  @started = false
-  @configure_list_opts = []
-
   hook :before_ready do |resource|
     parent = resource.opts.parent
 
     # merging properties with parent properties
     resource.property = resource.property.merge(parent.property)
+
+    resource.property.broker_topic = nil
+    resource.property.broker_vm_topic = nil
+    resource.property.started = false
+    resource.property.configure_list_opts = []
+
+    debug "BEFORE READY:"
+    debug resource.property.broker_topic
+    debug resource.property.broker_vm_topic
+    debug resource.property.started
+    debug resource.property.configure_list_opts
+    debug "-------------"
 
     # broker config...
     debug "Subscribing to broker topic: #{resource.property.broker_topic_name}"
@@ -263,17 +270,17 @@ module OmfRc::ResourceProxy::VirtualMachine
         error = "Could not subscribe to broker topic"
         resource.log_inform_error(error)
       else
-        @broker_topic = topic
+        resource.property.broker_topic = topic
 
         debug "Checking if virtual machine '#{resource.property.label}' is available"
-        @broker_topic.create(:virtual_machine, {:label => resource.property.label}) do |msg|
+        resource.property.broker_topic.create(:virtual_machine, {:label => resource.property.label}) do |msg|
           if msg.error?
             error = "The virtual machine '#{resource.property.label}' is not available"
             resource.log_inform_error(error)
           else
             debug "Virtual machine '#{resource.property.label}' AVAILABLE!"
             resource.inform(:info, Hashie::Mash.new({:info => "Broker VM successfully got!"}))
-            @vm_topic = msg.resource
+            resource.property.broker_vm_topic = msg.resource
             resource.get_vm_opts
           end
         end
@@ -287,11 +294,11 @@ module OmfRc::ResourceProxy::VirtualMachine
 
   # Checks if resource is ready to receive configure commands
   configure_all do |res, conf_props, conf_result|
-    if @started && @vm_topic.nil?
+    if res.property.started && res.property.broker_vm_topic.nil?
       raise "This virtual machine '#{res.property.label}' is not avaiable, so nothing can be configured"
     end
 
-    if @started
+    if res.property.started
       conf_props.each { |k, v| conf_result[k] = res.__send__("configure_#{k}", v) }
     else
       configure_call = {
@@ -299,7 +306,7 @@ module OmfRc::ResourceProxy::VirtualMachine
           :conf_result => conf_result
       }
       debug "Resource not started yet, saving configure call: #{configure_call}..."
-      @configure_list_opts << configure_call
+      res.property.configure_list_opts << configure_call
     end
   end
 
@@ -495,7 +502,7 @@ module OmfRc::ResourceProxy::VirtualMachine
 
   work :get_vm_opts do |resource|
     info "Getting vm options from broker..."
-    @vm_topic.request([:ram, :cpu, :disk_image]) do |msg|
+    resource.property.broker_vm_topic.request([:ram, :cpu, :disk_image]) do |msg|
       if msg.error?
         resource.inform_error("Could not finish vm setup with broker: #{msg}")
       else
@@ -507,7 +514,7 @@ module OmfRc::ResourceProxy::VirtualMachine
         }
 
         debug "VM options got: #{resource.property.vm_opts}"
-        @started = true
+        resource.property.started = true
 
         # Call each configure called before started
         resource.call_prev_configures
@@ -516,9 +523,9 @@ module OmfRc::ResourceProxy::VirtualMachine
   end
 
   work :set_broker_info do |resource, broker_info|
-    unless @vm_topic.nil?
+    unless resource.property.broker_vm_topic.nil?
       debug "Sending broker VM info: '#{broker_info}'"
-      @vm_topic.configure(broker_info) do |msg|
+      resource.property.broker_vm_topic.configure(broker_info) do |msg|
         if msg.error?
           resource.log_inform_error("Could not set broker info: #{msg}")
         end
@@ -527,20 +534,20 @@ module OmfRc::ResourceProxy::VirtualMachine
   end
 
   work :call_prev_configures do |resource|
-    prev_configure_len = @configure_list_opts.size
+    prev_configure_len = resource.property.configure_list_opts.size
     if prev_configure_len > 0
       info_msg = "Executing previous '#{prev_configure_len}' configures called..."
       resource.inform(:info, Hashie::Mash.new({:info => info_msg}))
-      @configure_list_opts.each do |obj|
+      resource.property.configure_list_opts.each do |obj|
         debug "Calling previous called configure: #{obj}"
         resource.configure_all(obj[:conf_props], obj[:conf_result])
       end
-      @configure_list_opts = []
+      resource.property.configure_list_opts = []
     end
   end
 
   work :start_booting_monitor do |resource, vm_topic|
-    if @started
+    if resource.property.started
       Thread.new {
         debug "Starting booting monitoring to VM '#{vm_topic}'. Timeout set to #{resource.property.boot_timeout} " +
                   "seconds."

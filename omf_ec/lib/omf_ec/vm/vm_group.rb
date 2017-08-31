@@ -15,11 +15,13 @@ module OmfEc::Vm
     attr_reader :topic, :vms
 
     # @param [String] name of the group.
+    # @param [String] topic_name to subscribe.
+    # @param [Object] block
     def initialize(name, topic_name, &block)
       super()
-      self.id = "#{OmfEc.experiment.id}.#{self.name}"
-      self.name = name
-      self.topic_name = topic_name
+      @id = "#{OmfEc.experiment.id}.#{name}"
+      @name = name
+      @topic_name = topic_name
       @vms ||= []
 
       OmfEc.subscribe_topic(topic_name, self, &block)
@@ -31,25 +33,24 @@ module OmfEc::Vm
     end
 
     # Associate the topic reference when the subscription is received from OmfEc::subscribe_topic.
+    #
     # @param [Object] topic
     def associate_topic(topic)
       self.synchronize do
         @topic = topic
-        @topic.on_message do |msg|
-          info msg
-        end
       end
     end
 
     # Add a virtual machine in hypervisor.
+    #
     # @param [String] name of virtual machine.
     def addVm(name, &block)
       self.synchronize do
         vm = OmfEc::Vm::VirtualMachine.new(name, self)
-        if self.vms.find {|v| v.name == name}
-          error "The Vm (#{name}) already added."
+        if @vms.find {|v| v.name == name}
+          error "vm: #{name} - already added."
         else
-          self.vms << vm
+          @vms << vm
           OmfEc.experiment.add_vm(vm)
           block.call(vm) if block
         end
@@ -57,10 +58,11 @@ module OmfEc::Vm
     end
 
     # Create a new virtual machine in the hypervisor and receive the topic to manage it.
-    # @return [vm_topic] topic to manage the virtual machine.
+    #
+    # @param [Object] name of virtual machine.
+    # @param [Object] block
     def create_vm(name, &block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.has_topic
-      # self.synchronize do
       @topic.create(:virtual_machine, {:label => name}) do |vm|
         vm_topic = vm.resource
         if vm_topic.error?
@@ -71,11 +73,14 @@ module OmfEc::Vm
           end
         end
       end
-      # end
     end
 
+    # Find a virtual machine by name.
+    #
+    # @param [String] name of virtual machine
+    # @return [VirtualMachine]
     def vm(name)
-      self.vms.find {|v| v.name == name}
+      @vms.find {|v| v.name == name}
     end
 
   end

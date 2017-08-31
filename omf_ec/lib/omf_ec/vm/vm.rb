@@ -17,13 +17,15 @@ module OmfEc::Vm
     attr_reader :conf_params, :vlans, :users, :req_params, :params, :vm_state_up
 
     # @param [String] name name of virtual machine
+    # @param [VmGroup] vm_group
+    # @param [Object] block
     def initialize(name, vm_group, &block)
       super()
       unless vm_group.kind_of? OmfEc::Vm::VmGroup
         raise ArgumentError, "Expect VmGroup object, got #{vm_group.inspect}"
       end
       #
-      @id = "#{OmfEc.experiment.id}.#{@name}"
+      @id = "#{OmfEc.experiment.id}.#{name}"
       @name = name
       @vm_group = vm_group
       @vm_node = OmfEc::Vm::VmNode.new(name, self)
@@ -78,13 +80,18 @@ module OmfEc::Vm
       end
     end
 
+    # Create a virtual machine.
     #
+    # @example
+    #   vm1 = hyp1.vm('vm1')
+    #   vm1.create do
+    #     info "vm1 created"
+    #   end
     def create(&block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.vm_group.has_topic
       # create the vm in hypervisor
       self.recv_vm_topic do
         opts = {bridges: self.bridges}
-        # build the VM
         @vm_topic.configure(vm_opts: opts, action: :build) do |build_msg|
           if build_msg.success?
             info "vm: #{@name} - wait receive the message of creation and boot (initialized and done)"
@@ -165,26 +172,23 @@ module OmfEc::Vm
     # Configure the parameters.
     #
     # @example
-    #   # Creating a vm with hostname and a new user.
-    #   vm1.addVm('vm1', 'vm1.hyp.br') do |vm1|
+    #   hyp1.addVm('vm1', 'vm1.hyp.br') do |vm1|
     #     vm1.hostname= 'vm1-host'
-    #     vm1.if_name= 'eth1'
-    #     vm1.setUser("labora", 12345)
-    #     vm1.setVlan("193", "eth1")
+    #     vm1.addVlan(193, "eth0")
+    #     vm1.addVlan(201, "eth1")
     #   end
     def configure_params
       raise('This function can only be executed when there is a topic') unless self.has_vm_node_topic
       topic = @vm_node.topic
-      # info "configure_params::params -> #{@params}" # TODO:: problema que os parâmetros de string estão sendo enviados como array ex: ["labora-host"]
       @params.each do |key, value|
-        topic.configure({:"#{key}" => "#{value}"}) do |vm_param|
-          debug "configure_params::param: #{vm_param}" # TODO
+        if @conf_params.include?(key)
+          topic.configure({key => value[0]})
+        else
+          warn "The parameter '#{key}' is not available to be configured."
         end
       end
       @vlans.each do |vlan|
-        topic.configure(vlan: {interface: vlan[:interface], vlan_id: vlan[:vlan_id]}) do |vm_vlan|
-          debug "configure_params::vlan: #{vm_vlan}" # TODO
-        end
+        topic.configure(vlan: {interface: vlan[:interface], vlan_id: vlan[:vlan_id]})
       end
     end
 
@@ -195,7 +199,8 @@ module OmfEc::Vm
     #   vm("vm1").hostname = "labora-vm1"
     #
     #   # Will send FRCP REQUEST message
-    #   ovs.ip
+    #   vm("vm1").ip
+    #   vm("vm1").mac
     #
     def method_missing(name, *args, &block)
       if name =~ /(.+)=/
@@ -204,7 +209,7 @@ module OmfEc::Vm
         if @conf_params.include?("#{name}")
           @params[name] = *args
         else
-          error "method_missing::configure to #{name} is not available."
+          warn "The parameter '#{name}' is not available to be configured."
           return nil
         end
       else
@@ -212,7 +217,7 @@ module OmfEc::Vm
         if @req_params.include?("#{name}")
           name = "vm_#{name}".to_sym
         else
-          error "method_missing::request to #{name} is not available."
+          warn "The parameter '#{name}' is not available to be requested."
           return nil
         end
       end
@@ -236,7 +241,6 @@ module OmfEc::Vm
       case operation
         when :configure
           topic.configure({ name => value }, { assert: OmfEc.experiment.assertion }) do |msg|
-            debug "send_message::configure::received -> #{msg}"
             block.call(msg) if block
           end
         when :request
@@ -244,12 +248,10 @@ module OmfEc::Vm
             unless msg.success?
               error "Could not get #{name} at this time."
             end
-            debug "send_message::request::receive -> #{name}"
             block.call(msg[name]) if block
           end
         else
-          info "Operation not informed."
-        # type code here
+          info 'Operation not informed.'
       end
     end
 

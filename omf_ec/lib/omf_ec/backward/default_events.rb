@@ -131,16 +131,6 @@ module OmfEc
               all_vms_created?(state)
             end
 
-            # def all_vms_up?(state)
-            #   all_vms? do |vm|
-            #     vm.vm_state_up
-            #   end
-            # end
-            #
-            # def_event :ALL_VMS_UP do |state|
-            #   all_vms_up?(state)
-            # end
-
             # FlowVisor
             def all_flowvisor_created?(state)
               all_flowvisors? do |flowvisor|

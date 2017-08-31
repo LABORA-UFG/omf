@@ -11,9 +11,9 @@ VM_NAME = 'bruno_lease:vm5'
 defVmGroup(VM_GROUP, VM_TOPIC) do |vmg|
   vmg.addVm(VM_NAME) do |vm1|
     vm1.bridges = ['xenbr0', 'br1', 'br2']
-    vm1.hostname = "labora-host"
-    vm1.addVlan(101, "eth0")
-    vm1.addVlan(103, "eth1")
+    vm1.hostname = 'labora-host'
+    vm1.addVlan(101, 'eth0')
+    vm1.addVlan(103, 'eth1')
   end
 end
 
@@ -33,9 +33,9 @@ onEvent(:ALL_VM_GROUPS_UP) do |ev|
         info "vm: #{vm.name} - mac = #{vm1_mac}"
       end
     }
-    after(120) {
-      Experiment.done
-    }
+    # after(120) {
+    #   Experiment.done
+    # }
   end
 end
 

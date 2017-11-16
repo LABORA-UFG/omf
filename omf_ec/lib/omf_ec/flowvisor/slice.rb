@@ -32,6 +32,7 @@ module OmfEc::FlowVisor
       self.synchronize do
         @topic = topic
         self.__log_messages
+        self.__monitor
       end
     end
 
@@ -48,7 +49,7 @@ module OmfEc::FlowVisor
     end
 
     def addFlow(name, &block)
-      flow = OmfEc.FlowVisor.Flow.new(name)
+      flow = OmfEc::FlowVisor::Flow.new(name)
       if flow(name)
         error("The flow '#{name}' already added.")
       else
@@ -87,6 +88,19 @@ module OmfEc::FlowVisor
           info("Added flow: #{flow}")
         end
         block.call if block
+      end
+    end
+
+    # Monitor all error or warn information from the slice
+    #
+    def __monitor
+      raise('This function need to be executed after the slice creation') unless has_topic
+      @topic.on_error do |msg|
+        error("ERROR::Slice::#{@name}::#{msg[:reason]}")
+      end
+      @topic.on_warn do |msg|
+        warn(msg[:reason])
+        error("WARN::Slice::#{@name}::#{msg[:reason]}")
       end
     end
 

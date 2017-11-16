@@ -4,7 +4,7 @@
 # By downloading or using this software you accept the terms and the liability disclaimer in the License.
 
 require 'omf_ec/flowvisor/flow'
-require 'omf_ec/flowvisor/flowvisor'
+require 'omf_ec/flowvisor/flowvisor_description'
 require 'omf_ec/flowvisor/slice'
 
 module OmfEc

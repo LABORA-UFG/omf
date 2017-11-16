@@ -8,7 +8,7 @@ require 'monitor'
 
 module OmfEc::FlowVisor
 
-  class FlowVisor
+  class FlowVisorDescription
     include MonitorMixin
 
     attr_accessor :id
@@ -40,9 +40,9 @@ module OmfEc::FlowVisor
     end
 
     def addSlice(name, &block)
-      raise("The slice '#{name}' already created") unless slice(name)
+      raise("The slice '#{name}' already created") if slice(name)
 
-      slice = OmfEc.FlowVisor.Slice.new(name)
+      slice = OmfEc::FlowVisor::Slice.new(name)
       @slices[slice.name] = slice
       OmfEc.experiment.add_slice(slice)
       block ? block.call(slice) : slice
@@ -68,6 +68,7 @@ module OmfEc::FlowVisor
         return
       end
 
+      # TODO: stopped here
       @topic.create(:openflow_slice, {name: slice.name, controller_url: slice.controller}) do |msg|
         if msg.success?
           slice_topic = msg.resource

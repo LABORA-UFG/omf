@@ -68,7 +68,7 @@ module OmfEc::FlowVisor
         return
       end
 
-      @topic.create(:flowvisor_proxy, {name: slice.name, controller_url: slice.controller}) do |msg|
+      @topic.create(:openflow_slice, {name: slice.name, controller_url: slice.controller}) do |msg|
         if msg.success?
           slice_topic = msg.resource
           slice_topic.on_subscribed do

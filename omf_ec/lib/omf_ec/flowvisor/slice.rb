@@ -15,7 +15,6 @@ module OmfEc::FlowVisor
 
     # @param [String] name of slice
     def initialize(name)
-      super()
       @name = name
       @flows = []
       self.id = "#{OmfEc.experiment.id}.#{@name}"
@@ -29,11 +28,8 @@ module OmfEc::FlowVisor
     # Associate the topic reference when the subscription is received from OmfEc::FlowVisor::FlowVisor::create
     # @param [Topic] topic
     def associate_topic(topic)
-      self.synchronize do
-        @topic = topic
-        self.__log_messages
-        self.__monitor
-      end
+      @topic = topic
+      self.__log_messages
     end
 
     def __log_messages
@@ -88,19 +84,6 @@ module OmfEc::FlowVisor
           info("Added flow: #{flow}")
         end
         block.call if block
-      end
-    end
-
-    # Monitor all error or warn information from the slice
-    #
-    def __monitor
-      raise('This function need to be executed after the slice creation') unless has_topic
-      @topic.on_error do |msg|
-        error("ERROR::Slice::#{@name}::#{msg[:reason]}")
-      end
-      @topic.on_warn do |msg|
-        warn(msg[:reason])
-        error("WARN::Slice::#{@name}::#{msg[:reason]}")
       end
     end
 

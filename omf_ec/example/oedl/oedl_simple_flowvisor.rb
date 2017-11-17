@@ -3,25 +3,20 @@
 # You should find a copy of the License in LICENSE.TXT or at http://opensource.org/licenses/MIT.
 # By downloading or using this software you accept the terms and the liability disclaimer in the License.
 
-FLOWVISOR_TOPIC = 'vm-fibre-ovs'
+FLOWVISOR_TOPIC = 'vinicius-fw'
 
 defFlowVisor('fv1', FLOWVISOR_TOPIC ) do |flowvisor|
   flowvisor.addSlice('slice1') do |slice1|
-    slice1.controller = 'tcp:127.0.0.1:6633'
-    slice1.addFlow('pronto-porta-1') do |flow1|
+    slice1.controller = 'tcp:10.16.0.21:6633'
+    slice1.addFlow('ovs-1') do |flow1|
       flow1.operation = 'add'
-      flow1.device = '67:8c:08:9e:01:62:d6:63'
-      flow1.match = 'in_port=1,dl_vlan=193'
+      flow1.device = '00:00:00:16:3e:7a:ff:5a'
+      flow1.match = 'in_port=0'
     end
-    slice1.addFlow('netfpga-porta-2') do |flow2|
+    slice1.addFlow('ovs-2') do |flow2|
       flow2.operation = 'add'
-      flow2.device = '00:00:00:00:00:00:81:02'
-      flow2.match = 'in_port=2,dl_vlan=193'
-    end
-    slice1.addFlow('pronto-porta-2') do |flow3|
-      flow3.operation = 'add'
-      flow3.device = '67:8c:08:9e:01:62:d6:63'
-      flow3.match = 'in_port=2,dl_vlan=193'
+      flow2.device = '00:00:00:16:3e:88:28:a1'
+      flow2.match = 'in_port=0'
     end
   end
 end
@@ -29,33 +24,33 @@ end
 onEvent(:ALL_FLOWVISOR_UP) do |event|
   info "Successfully subscribed on '#{FLOWVISOR_TOPIC}' topic"
 
-  # flowvisor('fv1').createAllSlices
+  info "Creating slice 'slice1'"
 
-  flowvisor('fv1').create('slice1') do
-    slice1 = flowvisor('fv1').slice('slice1')
-    info "Slice #{slice1.name} created"
-  end
+  flowvisor('fv1').createAllSlices
+
+  # Or
+
+  # info "Creating slice 'slice1'"
+
+  # flowvisor('fv1').create('slice1') do
+  #   slice1 = flowvisor('fv1').slice('slice1')
+  #   info "Slice #{slice1.name} created"
+  # end
 
   onEvent(:ALL_SLICES_CREATED) do |ev_created|
     info 'All slices created'
 
-    flowvisor('fv1').slice('slice1').addFlow('netfpga-porta-1') do |flow4|
-      flow4.operation = 'add'
-      flow4.device = '00:00:00:00:00:00:81:02'
-      flow4.match = 'in_port=1,dl_vlan=193'
+    flowvisor('fv1').slice('slice1').installFlows do
+      info "Flows installed"
     end
 
-    flowvisor('fv1').slice('slice1').create('netfpga-porta-1') do |flow4|
-      info "Slice 1 with flow 4 created"
-    end
-
-    after(30) {
+    after(120) {
       info "Removing openflow flows..."
-      flowvisor('fv1').release('slice1')
       flowvisor('fv1').releaseAllSlices
+      # flowvisor('fv1').release('slice1')
     }
 
-    after(35) {
+    after(125) {
       Experiment.done
     }
 

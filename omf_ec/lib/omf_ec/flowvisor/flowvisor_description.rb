@@ -68,7 +68,6 @@ module OmfEc::FlowVisor
         return
       end
 
-      # TODO: stopped here
       @topic.create(:openflow_slice, {name: slice.name, controller_url: slice.controller}) do |msg|
         if msg.success?
           slice_topic = msg.resource

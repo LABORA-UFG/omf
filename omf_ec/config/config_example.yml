@@ -1,0 +1,12 @@
+communication:
+  url: amqp://pubsub
+  user: testbed
+  pass: lab251
+  auth:
+    authenticate: true
+
+root_cert_dir: ~/.omf/trusted_roots
+cert: /home/vinicius/.omf/am.pem
+key: /home/vinicius/.omf/am.pkey
+
+#oml_uri: tcp:localhost:3003

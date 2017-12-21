@@ -58,6 +58,7 @@ module OmfRc::ResourceProxy::Hipervisor
   property :image_directory, :default => VM_DIR_DEFAULT
   property :image_path, :default => VM_DIR_DEFAULT
   property :broker_topic_name, :default => "am_controller"
+  property :boot_timeout, :default => 150
 
   # Properties to run ssh command
   property :ssh_params, :default => {
@@ -76,8 +77,13 @@ module OmfRc::ResourceProxy::Hipervisor
     if type.to_sym == :virtual_machine
       raise 'You need to inform the virtual machine label' if opts[:label].nil?
       opts[:broker_topic_name] = res.property.broker_topic_name
+      opts[:vm_name] = opts[:label]
+      opts[:image_directory] = res.property.image_directory
+      opts[:image_path] = "#{opts[:image_directory]}/#{opts[:label]}"
+      opts[:boot_timeout] = res.property.boot_timeout
+    else
+      raise "This resource only creates VM! (Cannot create a resource: #{type})"
     end
-    raise "This resource only creates VM! (Cannot create a resource: #{type})"
   end
 
   hook :after_create do |res, child_res|

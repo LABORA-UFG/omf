@@ -15,6 +15,7 @@ module OmfEc::Vm
     attr_reader :topic, :vm
 
     # @param [String] name of the vm node.
+    # @param [VirtualMachine] vm
     def initialize(name, vm)
       super()
       unless vm.kind_of? OmfEc::Vm::VirtualMachine
@@ -24,9 +25,11 @@ module OmfEc::Vm
       @vm = vm
     end
 
+    # @param [String] topic_name
+    # @param [Object] block
     def subscribe(topic_name, &block)
-      self.topic_name = topic_name
-      OmfEc.subscribe_topic(topic_name, self, &block)
+      @topic_name = topic_name
+      OmfEc.subscribe_topic(@topic_name, self, &block)
     end
 
     # Verify if has a topic associated with this class, used to trigger the event :ALL_VM_GROUPS_UP.
@@ -35,6 +38,7 @@ module OmfEc::Vm
     end
 
     # Associate the topic reference when the subscription is received from OmfEc::subscribe_topic.
+    #
     # @param [Object] topic
     def associate_topic(topic)
       self.synchronize do

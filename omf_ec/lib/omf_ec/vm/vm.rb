@@ -14,26 +14,27 @@ module OmfEc::Vm
     attr_accessor :id, :name, :vm_group
     attr_accessor :ram, :cpu, :bridges, :image
     attr_reader :vm_topic, :vm_node
-    attr_reader :conf_params, :vlans, :users, :req_params, :params
-
-    TIME_TO_VM_RUN = 58
+    attr_reader :conf_params, :vlans, :users, :req_params, :params, :vm_state_up
 
     # @param [String] name name of virtual machine
+    # @param [VmGroup] vm_group
+    # @param [Object] block
     def initialize(name, vm_group, &block)
       super()
       unless vm_group.kind_of? OmfEc::Vm::VmGroup
         raise ArgumentError, "Expect VmGroup object, got #{vm_group.inspect}"
       end
       #
-      @id = "#{OmfEc.experiment.id}.#{self.name}"
+      @id = "#{OmfEc.experiment.id}.#{name}"
       @name = name
       @vm_group = vm_group
       @vm_node = OmfEc::Vm::VmNode.new(name, self)
 
       # configure the parameters when there is a topic and the state of vm is running
       @params = {}
-      @conf_params = %w(hostname if_name)
-      @req_params = %w(ip mac state)
+      @conf_params = %w(hostname)
+      @req_params = %w(ip mac)
+      @vm_state_up = false
       @vlans = []
       @users = []
     end
@@ -62,7 +63,7 @@ module OmfEc::Vm
     # @param [String] interface
     def addVlan(vlan_id, interface)
       self.synchronize do
-        @vlans << {vlan_id: vlan_id, interface: interface}
+        @vlans << {vlan_id: vlan_id.to_s, interface: interface}
       end
     end
 
@@ -70,45 +71,55 @@ module OmfEc::Vm
     def recv_vm_topic(&block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.vm_group.has_topic
       if self.has_topic
-        if block
-          block.call
-        else
-          return nil
-        end
-      end
-      @vm_group.create_vm do |vm_topic|
-        @vm_topic = vm_topic
-        @vm_topic.configure(vm_name: self.name) do |vm_name|
-          info "recv_vm_topic::configure::vm_name: #{vm_name}" # TODO
+        block ? block.call : nil
+      else
+        @vm_group.create_vm(@name) do |vm_topic|
+          @vm_topic = vm_topic
           block.call if block
         end
       end
     end
 
+    # Create a virtual machine.
     #
+    # @example
+    #   vm1 = hyp1.vm('vm1')
+    #   vm1.create do
+    #     info "vm1 created"
+    #   end
     def create(&block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.vm_group.has_topic
       # create the vm in hypervisor
       self.recv_vm_topic do
-        opts = {ram: self.ram, cpu: self.cpu, bridges: self.bridges, disk: {image: self.image}}
-        # build the VM
+        opts = {bridges: self.bridges}
         @vm_topic.configure(vm_opts: opts, action: :build) do |build_msg|
           if build_msg.success?
-            # wait receive the message of creation of the VM
+            info "vm: #{@name} - wait receive the message of creation and boot (initialized and done)"
             @vm_topic.on_message do |msg|
-              if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:vm_topic]
-                sleep(TIME_TO_VM_RUN)
+              if msg.itype == "CREATION.PROGRESS"
+                info "vm: #{@name} progress #{msg.properties[:progress]}"
+              elsif msg.itype == 'VM.TOPIC'
                 @vm_node.subscribe(msg.properties[:vm_topic]) do
-                  # after created configure the host parameters
-                  self.configure_params
-                  block.call if block
+                  @vm_node.topic.on_message do |vm_node_msg|
+                    if vm_node_msg.itype == 'BOOT.INITIALIZED'
+                      info "vm: #{@name} boot initialized."
+                    end
+                    if vm_node_msg.itype == 'BOOT.DONE'
+                      info "vm: #{@name} boot done."
+                      @vm_state_up = true
+                      self.configure_params
+                      block.call if block
+                    end
+                  end
                 end
+              elsif msg.itype == 'BOOT.TIMEOUT'
+                info "vm: #{@name} not initialized, timeout of #{msg.properties[:timeout]} seconds."
+              elsif msg.itype == "ERROR" and msg.has_properties? and msg.properties[:reason]
+                info "#{@name} ERROR = #{msg.properties[:reason]}"
               end
             end
-            # start listen messages of VM
-            listen_messages
           else
-            info "Could not create the VM: #{self.name}"
+            info "Could not create the vm: #{@name}"
           end
         end
       end
@@ -158,50 +169,26 @@ module OmfEc::Vm
       warn 'This function is not implemented'
     end
 
-    # Calling standard methods or assignments will simply trigger sending a FRCP message
-    #
-    def listen_messages
-      raise('This function can only be executed when there is a topic') unless self.vm_topic
-      @vm_topic.on_message do |msg|
-        # if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:vm_topic]
-        #   # info 'listen_messages::receive_vm_topic'
-        # end
-        if msg.itype == "STATUS" and msg.has_properties? and msg.properties[:progress]
-          info "#{@name} progress: #{msg.properties[:progress]}"
-        elsif msg.itype == "ERROR" and msg.has_properties? and msg.properties[:reason]
-          info "#{@name} ERROR = #{msg.properties[:reason]}"
-        end
-      end
-    end
-
     # Configure the parameters.
     #
     # @example
-    #   # Creating a vm with hostname and a new user.
-    #   vm1.addVm('vm1', 'vm1.hyp.br') do |vm1|
+    #   hyp1.addVm('vm1', 'vm1.hyp.br') do |vm1|
     #     vm1.hostname= 'vm1-host'
-    #     vm1.if_name= 'eth1'
-    #     vm1.setUser("labora", 12345)
-    #     vm1.setVlan("193", "eth1")
+    #     vm1.addVlan(193, "eth0")
+    #     vm1.addVlan(201, "eth1")
     #   end
     def configure_params
       raise('This function can only be executed when there is a topic') unless self.has_vm_node_topic
       topic = @vm_node.topic
-      # info "configure_params::params -> #{@params}" # TODO:: problema que os parâmetros de string estão sendo enviados como array ex: ["labora-host"]
       @params.each do |key, value|
-        topic.configure({:"#{key}" => "#{value}"}) do |vm_param|
-          debug "configure_params::param: #{vm_param}" # TODO
-        end
-      end
-      @users.each do |user|
-        topic.configure(user: [{username: user[:username], password: user[:password]}]) do |vm_user|
-          debug "configure_params::user: #{vm_user}" # TODO
+        if @conf_params.include?(key)
+          topic.configure({key => value[0]})
+        else
+          warn "The parameter '#{key}' is not available to be configured."
         end
       end
       @vlans.each do |vlan|
-        topic.configure(vlan: [{interface: vlan[:interface], vlan_id: vlan[:vlan_id]}]) do |vm_vlan|
-          debug "configure_params::vlan: #{vm_vlan}" # TODO
-        end
+        topic.configure(vlan: {interface: vlan[:interface], vlan_id: vlan[:vlan_id]})
       end
     end
 
@@ -212,7 +199,8 @@ module OmfEc::Vm
     #   vm("vm1").hostname = "labora-vm1"
     #
     #   # Will send FRCP REQUEST message
-    #   ovs.ip
+    #   vm("vm1").ip
+    #   vm("vm1").mac
     #
     def method_missing(name, *args, &block)
       if name =~ /(.+)=/
@@ -221,7 +209,7 @@ module OmfEc::Vm
         if @conf_params.include?("#{name}")
           @params[name] = *args
         else
-          error "method_missing::configure to #{name} is not available."
+          warn "The parameter '#{name}' is not available to be configured."
           return nil
         end
       else
@@ -229,7 +217,7 @@ module OmfEc::Vm
         if @req_params.include?("#{name}")
           name = "vm_#{name}".to_sym
         else
-          error "method_missing::request to #{name} is not available."
+          warn "The parameter '#{name}' is not available to be requested."
           return nil
         end
       end
@@ -253,7 +241,6 @@ module OmfEc::Vm
       case operation
         when :configure
           topic.configure({ name => value }, { assert: OmfEc.experiment.assertion }) do |msg|
-            debug "send_message::configure::received -> #{msg}"
             block.call(msg) if block
           end
         when :request
@@ -261,12 +248,10 @@ module OmfEc::Vm
             unless msg.success?
               error "Could not get #{name} at this time."
             end
-            debug "send_message::request::receive -> #{name}"
             block.call(msg[name]) if block
           end
         else
-          info "Operation not informed."
-        # type code here
+          info 'Operation not informed.'
       end
     end
 

@@ -63,7 +63,7 @@ module OmfCommon
         def _init_amqp()
           channel = @communicator.channel
           @exchange = channel.topic(id, :auto_delete => true)
-          channel.queue("", :exclusive => true, :auto_delete => true) do |queue|
+          channel.queue("", :auto_delete => true) do |queue|
             queue.bind(@exchange, routing_key: @routing_key)
 
             queue.subscribe do |headers, payload|

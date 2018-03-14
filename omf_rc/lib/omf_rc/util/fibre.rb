@@ -24,6 +24,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 require 'erb'
+require 'nokogiri'
 
 #
 # This module defines the command specifics to build a VM image using
@@ -54,21 +55,20 @@ module OmfRc::Util::Fibre
   property :virt_install_path, :default => VIRT_INSTALL_PATH
   property :vm_opts, :default => VM_OPTS_DEFAULT
   property :image_template_path, :default => "/root/images_templates"
-  property :image_final_path, :default => "/var/lib/libvirt/images"
+  property :image_directory, :default => "/var/lib/libvirt/images"
 
   work :build_img_with_fibre do |res|
     params = {}
     params[:vm_name]= res.property.vm_name
 
+    res.list_vms_using_ssh()
+
     # Add virt-install options
     res.property.vm_opts.each do |k, v|
       if k == "bridges"
         params[:bridges] = v
-        # v.each do |bridge_name|
-        #   params[:bridges].push(bridge_name)
-        # end
       elsif k == "disk"
-        image_name = "#{res.property.image_final_path}/#{v.image}_#{res.property.vm_name}_#{Time.now.to_i}.img"
+        image_name = "#{res.property.image_directory}/#{v.image}_#{res.property.vm_name}.img"
         res.property.image_name = image_name
         params[:disk] = image_name
         res.create_template_copy(v.image, image_name)
@@ -76,15 +76,14 @@ module OmfRc::Util::Fibre
         params[k.to_sym] = v
       end
     end
-    template_path = File.join(File.dirname(File.expand_path(__FILE__)), "vm_template.erb")
-    template = File.read(template_path)
 
-    renderer = ERB.new(template, 0, "%<>")
-    domain_xml = renderer.result(binding)
+    vm_template_name = res.list_vms_using_ssh
+    xml_template = res.get_template_example(vm_template_name)
+    domain_xml = res.create_xml_template(xml_template, params)
 
     logger.info domain_xml
 
-    domain_file = File.join(File.dirname(File.expand_path(__FILE__)), "domain_#{res.property.vm_name}_#{Time.now.to_i}.erb")
+    domain_file = File.join(File.dirname(File.expand_path(__FILE__)), "domain_#{res.property.vm_name}.xml")
     File.write(domain_file, domain_xml)
 
     res.property.vm_definition = domain_file
@@ -107,6 +106,98 @@ module OmfRc::Util::Fibre
     end
 
     result
+  end
+
+  work :list_vms_using_ssh do |res|
+    user = res.property.ssh_params.user
+    ip_address = res.property.ssh_params.ip_address
+    port = res.property.ssh_params.port
+    key_file = res.property.ssh_params.key_file
+
+    cmd = "xen list"
+
+    vms_list = res.ssh_command(user, ip_address, port, key_file, cmd)
+    vm_info = vms_list.split("\n")[2]
+    vm_name = vm_info.split(" ")[0]
+    debug "Selected VM = #{vm_name}"
+    vm_name
+  end
+
+  work :get_template_example do |res, vm_name|
+    cmd = "virsh -c #{res.property.hypervisor_uri} dumpxml #{vm_name}"
+    output = res.execute_cmd(cmd, "Getting a VM template example",
+                             "Cannot find a VM temlate example!", "VM temlate example was successfully got!")
+    start_reading = false
+    xml_text = ""
+    output.each_line do |li|
+      # Idenfity the XML part of the virsh dumpxml return
+      start_reading = true if (li[/^<domain/]) and not start_reading
+      xml_text += li if start_reading
+    end
+    doc = Nokogiri::XML(xml_text)
+    doc
+  end
+
+  work :create_xml_template do |res, doc, params|
+    doc.root.remove_attribute('id')
+
+    xml_os = doc.at('os')
+    xml_os.remove
+    xml_os = Nokogiri::XML::Node.new("os", doc)
+    xml_type = Nokogiri::XML::Node.new("type", doc)
+    xml_type.content = 'linux'
+
+    xml_os << xml_type
+    doc.root << xml_os
+
+    xml_name = doc.at("name")
+    xml_name.content = params[:vm_name]
+
+    xml_uuid = doc.at("uuid")
+    xml_uuid.remove
+
+    xml_memory = doc.at('memory')
+    xml_memory['unit'] = "MiB"
+    xml_memory.content = params[:ram]
+
+    xml_current_memory = doc.at('currentMemory')
+    xml_current_memory['unit'] = "MiB"
+    xml_current_memory.content = params[:ram]
+
+    xml_vcpu = doc.at('vcpu')
+    xml_vcpu.content = params[:cpu]
+
+    doc.search('//disk').each_with_index do |disk, index|
+      source = disk.at('source')
+      source.content = params[:disk]
+      disk.remove if index != 0
+    end
+
+    doc.search('//interface').each do |disk|
+      disk.remove
+    end
+
+    xml_devices = doc.at('devices')
+
+    xml_disk = Nokogiri::XML::Node.new("disk", doc)
+    xml_source = Nokogiri::XML::Node.new("source", doc)
+    xml_source['file'] = params[:disk]
+    xml_disk << xml_source
+    xml_devices << xml_disk
+
+
+
+    params[:bridges].each {|bridge|
+      xml_interface = Nokogiri::XML::Node.new("interface", doc)
+      xml_interface['type'] = 'bridge'
+      xml_source = Nokogiri::XML::Node.new("source", doc)
+      xml_source['bridge'] = bridge
+
+      xml_interface << xml_source
+      xml_devices << xml_interface
+    }
+
+    doc
   end
 
   work :delete_vm_with_fibre do |res|

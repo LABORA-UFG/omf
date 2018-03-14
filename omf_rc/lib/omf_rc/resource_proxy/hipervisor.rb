@@ -59,6 +59,8 @@ module OmfRc::ResourceProxy::Hipervisor
   property :image_path, :default => VM_DIR_DEFAULT
   property :broker_topic_name, :default => "am_controller"
   property :boot_timeout, :default => 150
+  property :federate, :default => false
+  property :domain, :default => ''
 
   # Properties to run ssh command
   property :ssh_params, :default => {
@@ -81,6 +83,8 @@ module OmfRc::ResourceProxy::Hipervisor
       opts[:image_directory] = res.property.image_directory
       opts[:image_path] = "#{opts[:image_directory]}/#{opts[:label]}"
       opts[:boot_timeout] = res.property.boot_timeout
+      opts[:federate] = res.property.federate
+      opts[:domain] = res.property.domain
     else
       raise "This resource only creates VM! (Cannot create a resource: #{type})"
     end

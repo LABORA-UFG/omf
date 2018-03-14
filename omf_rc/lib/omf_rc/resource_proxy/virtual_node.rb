@@ -15,8 +15,15 @@ module OmfRc::ResourceProxy::VirtualNode
   @vm_topic = nil
   @started = false
   @configure_list_opts = []
+  @vm_mac = nil
 
   hook :before_ready do |resource|
+    if resource.uid.include? "fed"
+      @vm_mac = resource.uid.split('-')[2]
+    else
+      @vm_mac = resource.uid
+    end
+
     resource.inform(:BOOT_INITIALIZED, Hashie::Mash.new({:info => 'Virtual Machine successfully initialized.'}))
 
     debug "Subscribing to broker topic: #{resource.property.broker_topic_name}"
@@ -25,8 +32,8 @@ module OmfRc::ResourceProxy::VirtualNode
         resource.inform_error("Could not subscribe to broker topic")
       else
         @broker_topic = topic
-        debug "Creating broker virtual machine resource with mac_address: #{resource.uid}"
-        @broker_topic.create(:virtual_machine, {:mac_address => resource.uid}) do |msg|
+        debug "Creating broker virtual machine resource with mac_address: #{@vm_mac}"
+        @broker_topic.create(:virtual_machine, {:mac_address => @vm_mac}) do |msg|
           if msg.error?
             resource.inform_error("Could not create broker virtual machine resource topic")
           else
@@ -55,7 +62,7 @@ module OmfRc::ResourceProxy::VirtualNode
   end
 
   request :vm_mac do |resource|
-    resource.check_and_return_request(resource.uid)
+    resource.check_and_return_request(@vm_mac)
   end
 
   # Checks if resource is ready to receive configure commands

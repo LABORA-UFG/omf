@@ -98,12 +98,16 @@ module OmfRc
           OmfCommon::Auth.init
           rc_cert = OmfCommon.load_credentials(@opts[:credentials])
 
+          domain = @opts[:domain]
           @opts[:resources].each do |res_opts|
             rtype = res_opts.delete(:type)
             res_creation_opts = res_opts.delete(:creation_opts)
             res_creation_opts ||= res_opts.delete(:create_opts)
             res_creation_opts ||= {}
             res_opts[:certificate] = rc_cert
+            unless domain.nil?
+              res_opts[:domain] = domain
+            end
             begin
               OmfRc::ResourceFactory.create(rtype, res_opts, res_creation_opts)
             rescue => e

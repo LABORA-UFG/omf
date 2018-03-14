@@ -81,6 +81,7 @@ module OmfRc::ResourceProxy::Hipervisor
       opts[:broker_topic_name] = res.property.broker_topic_name
       opts[:vm_name] = opts[:label]
       opts[:image_directory] = res.property.image_directory
+      opts[:image_template_path] = res.property.image_template_path
       opts[:image_path] = "#{opts[:image_directory]}/#{opts[:label]}"
       opts[:boot_timeout] = res.property.boot_timeout
       opts[:federate] = res.property.federate

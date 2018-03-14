@@ -51,7 +51,7 @@ module OmfRc::Util::VirtInstall
   property :virt_install_path, :default => VIRT_INSTALL_PATH
   property :vm_opts, :default => VM_OPTS_DEFAULT
   property :image_template_path, :default => "/root/images_templates"
-  property :image_final_path, :default => "/var/lib/libvirt/images"
+  property :image_directory, :default => "/var/lib/libvirt/images"
 
   work :build_img_with_virt_install do |res|
     # Construct the virt-install command
@@ -73,7 +73,7 @@ module OmfRc::Util::VirtInstall
           cmd += " -w bridge=#{bridge_name}"
         end
       elsif k == "disk"
-        image_name = "#{res.property.image_final_path}/#{v.image}_#{res.property.vm_name}_#{Time.now.to_i}.img"
+        image_name = "#{res.property.image_directory}/#{v.image}_#{res.property.vm_name}_#{Time.now.to_i}.img"
         res.create_image(v.image, image_name)
         cmd += " --disk path=#{image_name}"
       else

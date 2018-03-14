@@ -181,6 +181,10 @@ module OmfCommon
         end
         local_address = "#{hostname}-#{Process.pid}"
       end
+      # Federate topic prepend
+      if @opts[:federate] == true && !@opts[:domain].nil?
+        local_address = "fed-#{@opts[:domain]}-#{local_address}"
+      end
       on_connected do
         @local_topic = create_topic(local_address.gsub('.', '-'))
       end

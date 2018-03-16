@@ -28,7 +28,7 @@ Gem::Specification.new do |s|
   s.add_development_dependency "mocha"
   s.add_runtime_dependency "omf_common", "= #{OmfCommon::VERSION}"
   s.add_runtime_dependency "cocaine", "= 0.5.8"
-  s.add_runtime_dependency "facter", "= 2.5.0"
+  s.add_runtime_dependency "facter", "= 2.4.6"
   s.add_runtime_dependency "macaddr", "= 1.7.1"
   s.add_runtime_dependency "nokogiri", "= 1.6.8"
 end

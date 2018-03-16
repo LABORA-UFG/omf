@@ -371,7 +371,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       result = res.send("build_img_with_#{res.property.img_builder}")
 
       res.property.vm_topic = result
-      if res.property.federate == true
+      if res.property.federate === true
         res.property.vm_topic = "fed-#{res.property.domain}-#{result}"
       end
 

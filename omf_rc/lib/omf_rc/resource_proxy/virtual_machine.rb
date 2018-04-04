@@ -243,6 +243,8 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :label
   property :broker_topic_name
   property :vm_opts, :default => {}
+  property :federate, :default => false
+  property :domain, :default => ''
 
   hook :before_ready do |resource|
     parent = resource.opts.parent
@@ -254,13 +256,6 @@ module OmfRc::ResourceProxy::VirtualMachine
     resource.property.broker_vm_topic = nil
     resource.property.started = false
     resource.property.configure_list_opts = []
-
-    debug "BEFORE READY:"
-    debug resource.property.broker_topic
-    debug resource.property.broker_vm_topic
-    debug resource.property.started
-    debug resource.property.configure_list_opts
-    debug "-------------"
 
     # broker config...
     debug "Subscribing to broker topic: #{resource.property.broker_topic_name}"
@@ -374,7 +369,11 @@ module OmfRc::ResourceProxy::VirtualMachine
     if vm_state.include? "Domain not found"
       res.set_broker_info({:status => BROKER_STATUS_CREATING})
       result = res.send("build_img_with_#{res.property.img_builder}")
+
       res.property.vm_topic = result
+      if res.property.federate === true
+        res.property.vm_topic = "fed-#{res.property.domain}-#{result}"
+      end
 
       # ----Setting up broker vm info ----
       is_created = !(res.property.vm_topic.include? "error:")

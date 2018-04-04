@@ -21,20 +21,20 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
 
   # specify any dependencies here; for example:
-  s.add_development_dependency "minitest", "~> 5.5.1"
+  s.add_development_dependency "minitest", "= 5.8.5"
   s.add_development_dependency "evented-spec", "~> 1.0.0.beta"
   s.add_development_dependency "simplecov"
   s.add_development_dependency "pry"
   s.add_development_dependency "mocha"
 
-  s.add_runtime_dependency "eventmachine"
-  s.add_runtime_dependency "logging", "~> 1.8.2"
+  s.add_runtime_dependency "eventmachine", "= 1.2.3"
+  s.add_runtime_dependency "logging", "= 1.8.2"
   s.add_runtime_dependency "hashie", "= 3.4.6"
-  s.add_runtime_dependency "oml4r", "~> 2.10.1"
+  s.add_runtime_dependency "oml4r", "= 2.10.6"
   s.add_runtime_dependency "amqp", "= 1.5.3"
   s.add_runtime_dependency "uuidtools"
 
-  s.add_runtime_dependency "oj"
-  s.add_runtime_dependency "oj_mimic_json"
-  s.add_runtime_dependency "json-jwt"
+  s.add_runtime_dependency "oj", "= 3.3.2"
+  s.add_runtime_dependency "oj_mimic_json", "= 1.0.1"
+  s.add_runtime_dependency "json-jwt", "= 1.7.2"
 end

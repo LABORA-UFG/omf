@@ -107,6 +107,7 @@ module OmfRc::ResourceProxy::VirtualNode
   end
 
   work :change_hostname do |res, new_hostname|
+    new_hostname = new_hostname.gsub("_", "-")
     current_hostname = File.read('/etc/hostname').delete("\n")
     File.write('/etc/hostname', new_hostname)
 
@@ -114,6 +115,8 @@ module OmfRc::ResourceProxy::VirtualNode
     hosts_content = hosts_content.gsub(current_hostname, new_hostname)
 
     File.write('/etc/hosts', hosts_content)
+
+    `hostname #{new_hostname}`
   end
 
   work :finish_vm_setup_with_broker do |resource|

@@ -368,11 +368,11 @@ module OmfRc::ResourceProxy::VirtualMachine
 
     if vm_state.include? "Domain not found"
       res.set_broker_info({:status => BROKER_STATUS_CREATING})
-      result = res.send("build_img_with_#{res.property.img_builder}")
+      mac_address = res.send("build_img_with_#{res.property.img_builder}")
 
-      res.property.vm_topic = result
+      res.property.vm_topic = mac_address
       if res.property.federate === true
-        res.property.vm_topic = "fed-#{res.property.domain}-#{result}"
+        res.property.vm_topic = "fed-#{res.property.domain}-#{mac_address}"
       end
 
       # ----Setting up broker vm info ----
@@ -382,7 +382,7 @@ module OmfRc::ResourceProxy::VirtualMachine
           :status => status
       }
       if is_created
-        broker_info[:mac_address] = res.property.vm_topic
+        broker_info[:mac_address] = mac_address
       end
       res.set_broker_info(broker_info)
       # ---- end broker integration ----
@@ -391,7 +391,7 @@ module OmfRc::ResourceProxy::VirtualMachine
         res.start_booting_monitor(res.property.vm_topic)
         res.inform(:VM_TOPIC, Hashie::Mash.new({:vm_topic => "#{res.property.vm_topic}"}))
       else
-        res.log_inform_error "Could not build VM: #{result}"
+        res.log_inform_error "Could not build VM: #{mac_address}"
       end
     else
       res.log_inform_error "Cannot build VM image: it is not stopped"+

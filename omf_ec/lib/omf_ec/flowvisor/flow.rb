@@ -11,7 +11,6 @@ module OmfEc::FlowVisor
 
     # @param [String] name to identify the flow
     def initialize(name)
-      super()
       self.name = name
     end
 

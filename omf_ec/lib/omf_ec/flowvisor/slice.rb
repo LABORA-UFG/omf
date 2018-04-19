@@ -15,7 +15,6 @@ module OmfEc::FlowVisor
 
     # @param [String] name of slice
     def initialize(name)
-      super()
       @name = name
       @flows = []
       self.id = "#{OmfEc.experiment.id}.#{@name}"
@@ -29,10 +28,8 @@ module OmfEc::FlowVisor
     # Associate the topic reference when the subscription is received from OmfEc::FlowVisor::FlowVisor::create
     # @param [Topic] topic
     def associate_topic(topic)
-      self.synchronize do
-        @topic = topic
-        self.__log_messages
-      end
+      @topic = topic
+      self.__log_messages
     end
 
     def __log_messages
@@ -48,7 +45,7 @@ module OmfEc::FlowVisor
     end
 
     def addFlow(name, &block)
-      flow = OmfEc.FlowVisor.Flow.new(name)
+      flow = OmfEc::FlowVisor::Flow.new(name)
       if flow(name)
         error("The flow '#{name}' already added.")
       else

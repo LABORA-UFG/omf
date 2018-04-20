@@ -33,7 +33,7 @@
 # @see OmfRc::ResourceProxy::VirtualMachine
 #
 module OmfRc::ResourceProxy::Hipervisor
-  include OmfRc::ResourceProxyDSL 
+  include OmfRc::ResourceProxyDSL
 
   register_proxy :hypervisor
   utility :common_tools
@@ -56,6 +56,7 @@ module OmfRc::ResourceProxy::Hipervisor
   property :img_builder, :default => IMAGE_BUILDER_DEFAULT
   property :enable_omf, :default => true
   property :image_directory, :default => VM_DIR_DEFAULT
+  property :image_template_path, :default => "/root/images_templates"
   property :image_path, :default => VM_DIR_DEFAULT
   property :broker_topic_name, :default => "am_controller"
   property :boot_timeout, :default => 150
@@ -86,6 +87,7 @@ module OmfRc::ResourceProxy::Hipervisor
       opts[:boot_timeout] = res.property.boot_timeout
       opts[:federate] = res.property.federate
       opts[:domain] = res.property.domain
+      opts[:ssh_params] = res.property.ssh_params
     else
       raise "This resource only creates VM! (Cannot create a resource: #{type})"
     end
@@ -95,4 +97,5 @@ module OmfRc::ResourceProxy::Hipervisor
     logger.info "Created new child VM: #{child_res.uid}"
     res.property.vm_list << child_res.uid
   end
+
 end

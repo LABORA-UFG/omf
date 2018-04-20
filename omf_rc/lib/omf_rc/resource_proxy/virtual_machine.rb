@@ -245,6 +245,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :vm_opts, :default => {}
   property :federate, :default => false
   property :domain, :default => ''
+  property :image_path
 
   hook :before_ready do |resource|
     parent = resource.opts.parent
@@ -256,6 +257,13 @@ module OmfRc::ResourceProxy::VirtualMachine
     resource.property.broker_vm_topic = nil
     resource.property.started = false
     resource.property.configure_list_opts = []
+
+    debug "BEFORE READY:"
+    debug resource.property.broker_topic
+    debug resource.property.broker_vm_topic
+    debug resource.property.started
+    debug resource.property.configure_list_opts
+    debug "-------------"
 
     # broker config...
     debug "Subscribing to broker topic: #{resource.property.broker_topic_name}"
@@ -371,7 +379,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       mac_address = res.send("build_img_with_#{res.property.img_builder}")
 
       res.property.vm_topic = mac_address
-      if res.property.federate === true
+      if res.property.federate
         res.property.vm_topic = "fed-#{res.property.domain}-#{mac_address}"
       end
 
@@ -500,7 +508,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   end
 
   work :get_vm_opts do |resource|
-    info "Getting vm options from broker..."
+    info "Getting vm (#{resource.property.label}) options from broker..."
     resource.property.broker_vm_topic.request([:ram, :cpu, :disk_image]) do |msg|
       if msg.error?
         resource.inform_error("Could not finish vm setup with broker: #{msg}")
@@ -512,7 +520,7 @@ module OmfRc::ResourceProxy::VirtualMachine
             :image => msg[:disk_image]
         }
 
-        debug "VM options got: #{resource.property.vm_opts}"
+        debug "VM (#{resource.property.label}) options got: #{resource.property.vm_opts}"
         resource.property.started = true
 
         # Call each configure called before started

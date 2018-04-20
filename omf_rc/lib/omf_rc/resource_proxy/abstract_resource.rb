@@ -125,10 +125,10 @@ class OmfRc::ResourceProxy::AbstractResource
 
     @type = type
     @uid = (@opts.delete(:uid) || SecureRandom.uuid).to_s
-    @domain = @opts.delete(:domain)
+    @domain = @opts[:domain]
     @domain = @domain.to_s if @domain
     #Concat exp domain when pass federate=true
-    federate_enable = @opts.delete(:federate)
+    federate_enable = @opts[:federate]
     if federate_enable == true and !@domain.nil? and !@uid.nil?
       @uid = "fed-#{@domain}-#{@uid}"
     end

@@ -62,9 +62,19 @@ module OmfCommon
 
         def _init_amqp()
           channel = @communicator.channel
-          @exchange = channel.topic(id, :auto_delete => true)
-          channel.queue("", :auto_delete => true) do |queue|
-            queue.bind(@exchange, routing_key: @routing_key)
+          @exchange = channel.topic(id, :auto_delete => true, :durable => true)
+          channel.queue("", :auto_delete => true, :durable => true) do |queue|
+            queue.bind(@exchange, routing_key: @routing_key) do ||
+              debug "Subscribed to '#@id'"
+              # Call all accumulated on_subscribed handlers
+              @lock.synchronize do
+                @subscribed = true
+                @on_subscribed_handlers.each do |block|
+                  after(2, &block)
+                end
+                @on_subscribed_handlers = nil
+              end
+            end
 
             queue.subscribe do |headers, payload|
               debug "Received message on #{@address} | #{@routing_key}"
@@ -72,15 +82,6 @@ module OmfCommon
               Message.parse(payload, headers.content_type) do |msg|
                 on_incoming_message(msg)
               end
-            end
-            debug "Subscribed to '#@id'"
-            # Call all accumulated on_subscribed handlers
-            @lock.synchronize do
-              @subscribed = true
-              @on_subscribed_handlers.each do |block|
-                after(0, &block)
-              end
-              @on_subscribed_handlers = nil
             end
           end
         end

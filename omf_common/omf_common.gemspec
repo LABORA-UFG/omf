@@ -30,7 +30,7 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "eventmachine", "= 1.2.3"
   s.add_runtime_dependency "logging", "= 1.8.2"
   s.add_runtime_dependency "hashie", "= 3.4.6"
-  s.add_runtime_dependency "oml4r", "= 2.10.1"
+  s.add_runtime_dependency "oml4r", "= 2.10.6"
   s.add_runtime_dependency "amqp", "= 1.5.3"
   s.add_runtime_dependency "uuidtools"
 

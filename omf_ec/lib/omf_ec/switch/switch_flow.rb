@@ -62,7 +62,7 @@ module OmfEc::Switch
     #
     # @return [String] flow
     def flow_s
-      flow = Array.to_s
+      flow = Array.new
       flow << @match.to_s if @match.has_flow
       flow << @action.to_s if @action.has_flow
       flow.join(',')

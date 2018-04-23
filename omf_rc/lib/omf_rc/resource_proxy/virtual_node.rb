@@ -19,7 +19,7 @@ module OmfRc::ResourceProxy::VirtualNode
 
   hook :before_ready do |resource|
     if resource.uid.include? "fed"
-      @vm_mac = resource.uid.split('-')[2]
+      @vm_mac = resource.uid.split('-').last
     else
       @vm_mac = resource.uid
     end
@@ -37,8 +37,9 @@ module OmfRc::ResourceProxy::VirtualNode
           if msg.error?
             resource.inform_error("Could not create broker virtual machine resource topic")
           else
-            debug "Broker virtual machine resource created successfully!"
             @vm_topic = msg.resource
+            info_msg = "Broker virtual machine resource created successfully! VM_TOPIC: #{@vm_topic}"
+            resource.inform(:info, Hashie::Mash.new({:info => info_msg}))
             Thread.new {
               info_msg = 'Waiting 30 seconds to finalize VM setup with broker...'
               resource.inform(:info, Hashie::Mash.new({:info => info_msg}))
@@ -107,6 +108,7 @@ module OmfRc::ResourceProxy::VirtualNode
   end
 
   work :change_hostname do |res, new_hostname|
+    new_hostname = new_hostname.gsub("_", "-")
     current_hostname = File.read('/etc/hostname').delete("\n")
     File.write('/etc/hostname', new_hostname)
 
@@ -114,11 +116,14 @@ module OmfRc::ResourceProxy::VirtualNode
     hosts_content = hosts_content.gsub(current_hostname, new_hostname)
 
     File.write('/etc/hosts', hosts_content)
+
+    `hostname #{new_hostname}`
   end
 
   work :finish_vm_setup_with_broker do |resource|
     unless @vm_topic.nil?
-      info 'Finishing setup with broker...'
+      info_msg = 'Finishing setup with broker...'
+      resource.inform(:info, Hashie::Mash.new({:info => info_msg}))
 
       cmd = "echo '' > /root/.ssh/authorized_keys"
       resource.execute_cmd(cmd, "Clearing ssh public keys...",
@@ -126,11 +131,16 @@ module OmfRc::ResourceProxy::VirtualNode
 
       @vm_topic.request([:user_public_keys]) do |msg|
         vm_keys = msg[:user_public_keys]
-        vm_keys.each do |key|
-          key[:ssh_key] = Base64.decode64(key[:ssh_key]) if key[:is_base64]
-          cmd = "echo '#{key[:ssh_key]}' >> /root/.ssh/authorized_keys"
-          resource.execute_cmd(cmd, "Adding user public key '#{key[:ssh_key]}' to authorized_keys",
-                          "Cannot add public key", "Public key succesfully added")
+        if not vm_keys.nil? and vm_keys.kind_of?(::Array)
+            vm_keys.each do |key|
+              key[:ssh_key] = Base64.decode64(key[:ssh_key]) if key[:is_base64]
+              cmd = "echo '#{key[:ssh_key]}' >> /root/.ssh/authorized_keys"
+              resource.execute_cmd(cmd, "Adding user public key '#{key[:ssh_key]}' to authorized_keys",
+                              "Cannot add public key", "Public key succesfully added")
+            end
+        else
+          resource.inform_error("User public keys in wrong format. They must be Array but is #{vm_keys.class}") unless vm_keys.nil?
+          resource.inform_error("User public keys are nil.") if vm_keys.nil?
         end
       end
     end
@@ -142,7 +152,9 @@ module OmfRc::ResourceProxy::VirtualNode
       ip_address = resource.request_vm_ip
       status = 'UP_AND_READY'
 
-      info "Setting vm status on broker to '#{status}' and ip address to '#{ip_address}'"
+      info_msg = "Setting vm status on broker to '#{status}' and ip address to '#{ip_address}'"
+      resource.inform(:info, Hashie::Mash.new({:info => info_msg}))
+
       @vm_topic.configure(status: status, ip_address: ip_address) do |msg|
         if msg.error?
           resource.inform_error("Could not finish vm setup with broker: #{msg}")

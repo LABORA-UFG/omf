@@ -75,10 +75,10 @@ module OmfEc
       block.call(app_def) if block
     end
 
-    # Define a vm group, create a pubsub topic for the vm group.
+    # Define a flowvisor, create a pubsub topic for the flowvisor.
     #
     def def_flow_visor(name, topic_name, &block)
-      flowvisor = OmfEc::FlowVisor::FlowVisor.new(name, topic_name)
+      flowvisor = OmfEc::FlowVisor::FlowVisorDescription.new(name, topic_name)
       OmfEc.experiment.add_flowvisor(flowvisor)
       block.call(flowvisor) if block
     end

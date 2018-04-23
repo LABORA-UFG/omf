@@ -68,7 +68,7 @@ module OmfRc::Util::Fibre
       if k == "bridges"
         params[:bridges] = v
       elsif k == "disk"
-        image_name = "#{res.property.image_directory}/#{v.image}_#{res.property.vm_name}.img"
+        image_name = "#{res.property.image_directory}/#{res.property.vm_name}.img"
         res.property.image_name = image_name
         params[:disk] = image_name
         res.create_template_copy(v.image, image_name)
@@ -165,11 +165,19 @@ module OmfRc::Util::Fibre
     xml_current_memory.content = params[:ram]
 
     xml_vcpu = doc.at('vcpu')
+
+    xml_vcpu.remove
+    xml_vcpu = Nokogiri::XML::Node.new("vcpu", doc)
     xml_vcpu.content = params[:cpu]
+
+    doc.root << xml_vcpu
 
     doc.search('//disk').each_with_index do |disk, index|
       source = disk.at('source')
-      source.content = params[:disk]
+      source['file'] = params[:disk]
+      target = disk.at('target')
+      target['dev'] = "hda"
+      target['bus'] = "ide"
       disk.remove if index != 0
     end
 
@@ -179,13 +187,8 @@ module OmfRc::Util::Fibre
 
     xml_devices = doc.at('devices')
 
-    xml_disk = Nokogiri::XML::Node.new("disk", doc)
-    xml_source = Nokogiri::XML::Node.new("source", doc)
-    xml_source['file'] = params[:disk]
-    xml_disk << xml_source
-    xml_devices << xml_disk
-
-
+    console = xml_devices.at('console')
+    console.remove
 
     params[:bridges].each {|bridge|
       xml_interface = Nokogiri::XML::Node.new("interface", doc)

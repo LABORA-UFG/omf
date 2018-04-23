@@ -75,7 +75,10 @@ module OmfEc::Vm
       else
         @vm_group.create_vm(@name) do |vm_topic|
           @vm_topic = vm_topic
-          block.call if block
+          #TODO discover a better way to make sure the RC get messages
+          after(2) {
+            block.call if block
+          }
         end
       end
     end

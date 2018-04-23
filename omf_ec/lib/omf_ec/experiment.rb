@@ -121,10 +121,10 @@ module OmfEc
     # FlowVisor resource
     ##
 
-    # @param [OmfEc::FlowVisor::FlowVisor] flowvisor
+    # @param [OmfEc::FlowVisor::FlowVisorDescription] flowvisor
     def add_flowvisor(flowvisor)
       self.synchronize do
-        unless flowvisor.kind_of? OmfEc::FlowVisor::FlowVisor
+        unless flowvisor.kind_of? OmfEc::FlowVisor::FlowVisorDescription
           raise ArgumentError, "Expect FlowVisor object, got #{flowvisor.inspect}"
         end
         @flowvisors << flowvisor unless flowvisor(flowvisor.name)

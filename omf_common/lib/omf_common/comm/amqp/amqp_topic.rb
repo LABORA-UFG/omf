@@ -33,7 +33,7 @@ module OmfCommon
             end
           end
           if call_now
-            after(0, &block)
+            after(2, &block)
           end
         end
 

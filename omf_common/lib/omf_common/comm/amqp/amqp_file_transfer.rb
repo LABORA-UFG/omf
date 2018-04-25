@@ -46,13 +46,13 @@ module OmfCommon
         
         #chunk_count.times.each {|i| @outstanding_chunks << i}
 
-        exchange = channel.topic(topic, :auto_delete => true)
+        exchange = channel.topic(topic, :auto_delete => true, :durable => true)
         OmfCommon.eventloop.defer do
           _send(f, chunk_size, chunk_count, exchange, idle_time)
         end
         
         control_topic = "#{topic}_control"
-        control_exchange = channel.topic(control_topic, :auto_delete => true)
+        control_exchange = channel.topic(control_topic, :auto_delete => true, :durable => true)
         channel.queue("", :exclusive => false) do |queue|
           queue.bind(control_exchange)
           debug "Subscribing to control channel '#{control_topic}'"
@@ -145,7 +145,7 @@ module OmfCommon
         @received_anything = false
         
         control_topic = "#{topic}_control"
-        @control_exchange = channel.topic(control_topic, :auto_delete => true)
+        @control_exchange = channel.topic(control_topic, :auto_delete => true, :durable => true)
         channel.queue("", :exclusive => false) do |queue|
           queue.bind(@control_exchange)
           debug "Subscribing to control topic '#{control_topic}'"
@@ -169,7 +169,7 @@ module OmfCommon
 
         @nothing_received = WAIT_BEFORE_REQUESTING_EVERYTHING - 2 * WAIT_BEFORE_REQUESTING
 
-        data_exchange = channel.topic(topic, :auto_delete => true)
+        data_exchange = channel.topic(topic, :auto_delete => true, :durable => true)
         channel.queue("", :exclusive => false) do |queue|
           queue.bind(data_exchange)
           queue.subscribe do |headers, payload|

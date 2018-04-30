@@ -62,8 +62,8 @@ module OmfCommon
 
         def _init_amqp()
           channel = @communicator.channel
-          @exchange = channel.topic(id, :auto_delete => true, :durable => true)
-          channel.queue("", :auto_delete => true, :durable => true) do |queue|
+          @exchange = channel.topic(id, :auto_delete => true)
+          channel.queue("", :auto_delete => true) do |queue|
             queue.bind(@exchange, routing_key: @routing_key) do ||
               debug "Subscribed to '#@id'"
               # Call all accumulated on_subscribed handlers

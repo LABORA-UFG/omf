@@ -37,6 +37,8 @@ module OmfEc::Vm
       @vm_state_up = false
       @vlans = []
       @users = []
+      @waiting_ok_blocks = []
+      @is_waiting_ok = false
     end
 
     # Verify if has a virtual machine topic associated with this class.
@@ -73,9 +75,25 @@ module OmfEc::Vm
       if self.has_topic
         block ? block.call : nil
       else
+        if @is_waiting_ok
+          @waiting_ok_blocks << block if block
+          return
+        end
+
+        @is_waiting_ok = true
         @vm_group.create_vm(@name) do |vm_topic|
-          @vm_topic = vm_topic
-          block.call if block
+          # Wait until receive VM.IMOK message...
+          vm_topic.on_message do |msg|
+            debug "Message received on topic: #{msg.itype}" unless msg.nil? or msg.itype.nil?
+            if msg.itype == 'VM.IMOK'
+              debug "VM IMOK message successfully received, proceeding..."
+              @vm_topic = vm_topic
+              block.call if block
+              @waiting_ok_blocks.each do |wblock|
+                wblock.call if wblock
+              end
+            end
+          end
         end
       end
     end

@@ -256,14 +256,8 @@ module OmfRc::ResourceProxy::VirtualMachine
     resource.property.broker_topic = nil
     resource.property.broker_vm_topic = nil
     resource.property.started = false
+    resource.property.imOk = false
     resource.property.configure_list_opts = []
-
-    debug "BEFORE READY:"
-    debug resource.property.broker_topic
-    debug resource.property.broker_vm_topic
-    debug resource.property.started
-    debug resource.property.configure_list_opts
-    debug "-------------"
 
     # broker config...
     debug "Subscribing to broker topic: #{resource.property.broker_topic_name}"
@@ -289,6 +283,17 @@ module OmfRc::ResourceProxy::VirtualMachine
         end
       end
     end
+
+    # Send inform message to tell EC that the VM RC are ok and he can send the configure messages
+    Thread.new {
+      debug "Starting VM_IMOK inform send to OMF_EC until a configure message is not received..."
+      until resource.property.imOk
+        debug "Sending VM_IMOK message..."
+        resource.inform(:VM_IMOK)
+        sleep 1
+      end
+      debug "Configure received, stopping VM_IMOK messages sending..."
+    }
   end
 
   request :state do |res|
@@ -297,6 +302,7 @@ module OmfRc::ResourceProxy::VirtualMachine
 
   # Checks if resource is ready to receive configure commands
   configure_all do |res, conf_props, conf_result|
+    res.property.imOk = true
     if res.property.started && res.property.broker_vm_topic.nil?
       raise "This virtual machine '#{res.property.label}' is not avaiable, so nothing can be configured"
     end

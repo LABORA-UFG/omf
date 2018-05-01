@@ -81,12 +81,14 @@ module OmfEc::Vm
         end
 
         @is_waiting_ok = true
+        already_received = false
         @vm_group.create_vm(@name) do |vm_topic|
           # Wait until receive VM.IMOK message...
           vm_topic.on_message do |msg|
             debug "Message received on topic: #{msg.itype}" unless msg.nil? or msg.itype.nil?
-            if msg.itype == 'VM.IMOK'
+            if msg.itype == 'VM.IMOK' and already_received === false
               debug "VM IMOK message successfully received, proceeding..."
+              already_received = true
               @vm_topic = vm_topic
               block.call if block
               @waiting_ok_blocks.each do |wblock|

@@ -246,6 +246,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :federate, :default => false
   property :domain, :default => ''
   property :image_path
+  property :imOk, :default => false
 
   hook :before_ready do |resource|
     parent = resource.opts.parent
@@ -289,8 +290,8 @@ module OmfRc::ResourceProxy::VirtualMachine
       debug "Starting VM_IMOK inform send to OMF_EC until a configure message is not received..."
       until resource.property.imOk
         debug "Sending VM_IMOK message..."
-        resource.inform(:VM_IMOK)
         sleep 1
+        resource.inform(:VM_IMOK, {:info => "I am Ok"})
       end
       debug "Configure received, stopping VM_IMOK messages sending..."
     }

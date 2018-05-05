@@ -77,7 +77,7 @@ module OmfEc
 
     def extract_domain(topic_name)
       urn_parts = topic_name.split("+")
-      raise("The flowvisor topic should be in URN format") if urn_parts.size < 1
+      raise("The flowvisor topic should be in URN format") if urn_parts.size <= 1
       domain = urn_parts[1].gsub(".", "-")
       domain
     end

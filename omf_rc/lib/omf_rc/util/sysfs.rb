@@ -25,7 +25,11 @@ module OmfRc::Util::Sysfs
       File.exist?("#{v}/uevent") && File.open("#{v}/uevent") do |f|
         subcategory = f.read.match(/DEVTYPE=(.+)/) && $1
         proxy = "net"
-        File.exist?("#{v}/device/uevent") && File.open("#{v}/device/uevent") do |f|
+        device_uevent = v
+        if subcategory == 'vlan'
+          device_uevent = device_uevent.split('.')[0]
+        end
+        File.exist?("#{device_uevent}/device/uevent") && File.open("#{device_uevent}/device/uevent") do |f|
           driver = f.read.match(/DRIVER=(.+)/) && $1
           device = { name: File.basename(v), driver: driver, category: category }
           device[:subcategory] = subcategory if subcategory

@@ -12,7 +12,7 @@ module OmfEc::Vm
     include MonitorMixin
 
     attr_accessor :id, :name, :vm_group
-    attr_accessor :ram, :cpu, :bridges, :image
+    attr_accessor :ram, :cpu, :bridges, :image, :net_ifs
     attr_reader :vm_topic, :vm_node
     attr_reader :conf_params, :vlans, :users, :req_params, :params, :vm_state_up
 
@@ -39,6 +39,7 @@ module OmfEc::Vm
       @users = []
       @waiting_ok_blocks = []
       @is_waiting_ok = false
+      @net_ifs = []
     end
 
     # Verify if has a virtual machine topic associated with this class.
@@ -126,8 +127,8 @@ module OmfEc::Vm
                     end
                     if vm_node_msg.itype == 'BOOT.DONE'
                       info "vm: #{@name} boot done."
-                      @vm_state_up = true
                       self.configure_params
+                      @vm_state_up = true
                       block.call if block
                     end
                   end
@@ -207,8 +208,28 @@ module OmfEc::Vm
           warn "The parameter '#{key}' is not available to be configured."
         end
       end
+
+      configure_vlans_count = 0
       @vlans.each do |vlan|
-        topic.configure(vlan: {interface: vlan[:interface], vlan_id: vlan[:vlan_id]})
+        topic.configure(vlan: {interface: vlan[:interface], vlan_id: vlan[:vlan_id]}) do |vlan_msg|
+          configure_vlans_count = configure_vlans_count + 1
+          if configure_vlans_count == @vlans.length
+            # Configure network interfaces
+            if @net_ifs and @net_ifs.length > 0
+              info "Configuring network interfaces of vm: #{@name}"
+              @net_ifs.each do |nif|
+                r_type = nif.conf[:type]
+                conf_to_send = nif.conf.merge(type: r_type).except(:index)
+                send_message(:net, conf_to_send, :create)
+              end
+              info "vm: #{@name} interfaces configuration done!"
+            end
+          end
+        end
+      end
+
+      if @vlans.nil? or @vlans.length == 0
+        @vm_state_up = true
       end
     end
 
@@ -222,7 +243,29 @@ module OmfEc::Vm
     #   vm("vm1").ip
     #   vm("vm1").mac
     #
+    #   # Will configure interface
+    #   vm.net.w0_100.ip = '0.0.0.0'
+    #   vm.net.e0_100.ip = '0.0.0.1'
+    #
     def method_missing(name, *args, &block)
+      # Check if method is a network setup (disable wlan because VMS in FIBRE network will not have a wlan card)
+      # if name =~ /w(\d+)/ or name =~ /w(\d+)_(\d+)/ or name =~ /e(\d+)/ or name =~ /e(\d+)_(\d+)/
+      if name =~ /e(\d+)/ or name =~ /e(\d+)_(\d+)/
+        net_prefix = if name =~ /e(\d+)/ or name =~ /e(\d+)_(\d+)/ then 'eth' else 'wlan' end
+        net_type = if name =~ /e(\d+)/ or name =~ /e(\d+)_(\d+)/ then 'net' else 'wlan' end
+
+        if_id = name[1, name.length].gsub '_', '.'
+        if_id = if_id.split(' ')[0]
+        if_name = "#{net_prefix}#{if_id}"
+        net = @net_ifs.find { |v| v.conf[:if_name] == if_name }
+        if net.nil?
+          net = OmfEc::Context::NetContext.new(:type => net_type, :if_name => if_name)
+          @net_ifs << net
+        end
+        return net
+      end
+
+      # Not net setup, proceed...
       if name =~ /(.+)=/
         operation = :configure
         name = $1
@@ -270,10 +313,24 @@ module OmfEc::Vm
             end
             block.call(msg[name]) if block
           end
+        when :create
+          topic.create(name, value, assert: OmfEc.experiment.assertion) do |msg|
+            block.call(msg) if block
+          end
         else
           info 'Operation not informed.'
       end
     end
 
+    ## Defines network interfaces of virtual machine
+    # @example
+    #    vmg.addVm(VM1_NAME_UFG) do |vm|
+    #      vm.net.w0_100.ip = '0.0.0.0'
+    #      vm.net.e0_100.ip = '0.0.0.1'
+    #    end
+    def net
+      @net_ifs ||= []
+      self
+    end
   end
 end

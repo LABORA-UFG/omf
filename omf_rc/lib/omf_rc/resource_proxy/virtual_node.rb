@@ -5,6 +5,7 @@ module OmfRc::ResourceProxy::VirtualNode
 
   register_proxy :virtual_node
 
+  utility :sysfs
   utility :common_tools
   utility :ip
 
@@ -53,6 +54,27 @@ module OmfRc::ResourceProxy::VirtualNode
         end
       end
     end
+  end
+
+  hook :before_create do |node, type, opts|
+    if type.to_sym == :net
+      net_dev = node.request_devices.find do |v|
+        v[:name] == opts[:if_name]
+      end
+      raise StandardError, "Device '#{opts[:if_name]}' not found" if net_dev.nil?
+    end
+  end
+
+  request :interfaces do |node|
+    node.children.find_all { |v| v.type == :net || v.type == :wlan }.map do |v|
+      { name: v.property.if_name, type: v.type, uid: v.uid }
+    end.sort { |x, y| x[:name] <=> y[:name] }
+  end
+
+  request :applications do |node|
+    node.children.find_all { |v| v.type =~ /application/ }.map do |v|
+      { name: v.hrn, type: v.type, uid: v.uid }
+    end.sort { |x, y| x[:name] <=> y[:name] }
   end
 
   request :vm_ip do |resource|

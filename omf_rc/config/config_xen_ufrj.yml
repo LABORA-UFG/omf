@@ -1,0 +1,32 @@
+---
+# default topic name is this machine's hostname
+# this is to ensure that every RC has its own topic and AMQP account
+environment: development
+
+communication:
+  url: amqp://192.168.129.206
+  user: testbed
+  password: testbed
+
+resources:
+- type: node
+  uid: <%= Socket.gethostname %>
+- type: hypervisor
+  uid: <%= Socket.gethostname %>-xen
+  image_directory: /VMs/vm_images/
+  img_builder: fibre
+  omf_opts:
+    server: amqp://192.168.129.206
+    user: testbed
+    password: testbed
+    topic: <%= Socket.gethostname %>
+  hypervisor: xen
+  hypervisor_uri: xen+ssh://root@10.129.0.30/
+  virt_install_path: /usr/bin/virt-install
+  image_template_path: /VMs/images_templates/
+  image_final_path: /VMs/vm_images/
+  ssh_params:
+    ip_address: "10.129.0.30"
+    user: root
+    port: 22
+    key_file: "/root/.ssh/id_rsa"

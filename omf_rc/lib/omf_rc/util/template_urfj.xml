@@ -1,0 +1,45 @@
+<domain type='xen' id='1'>
+  <name>flowvisor</name>
+  <uuid>0a946095-c9ac-1b0d-b90d-42412acf5634</uuid>
+  <memory unit='KiB'>2097152</memory>
+  <currentMemory unit='KiB'>2097152</currentMemory>
+  <vcpu placement='static' cpuset='0-11'>1</vcpu>
+  <bootloader>/usr/lib/xen-4.1/bin/pygrub</bootloader>
+  <bootloader_args>-q</bootloader_args>
+  <os>
+    <type>linux</type>
+    <cmdline>root=/dev/xvda2 ro </cmdline>
+  </os>
+  <clock offset='utc' adjustment='reset'/>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>restart</on_crash>
+  <devices>
+    <disk type='file' device='disk'>
+      <driver name='file'/>
+      <source file='/VMs/flowvisor/disk.img'/>
+      <target dev='xvda2' bus='xen'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='file'/>
+      <source file='/VMs/flowvisor/swap.img'/>
+      <target dev='xvda1' bus='xen'/>
+    </disk>
+    <interface type='bridge'>
+      <mac address='00:16:3e:2f:5d:b4'/>
+      <source bridge='br_control'/>
+      <script path='/etc/xen/scripts/vif-bridge'/>
+      <target dev='vif1.0'/>
+    </interface>
+    <interface type='bridge'>
+      <mac address='00:16:3e:9c:8a:87'/>
+      <source bridge='omf6-br-test'/>
+      <script path='/etc/xen/scripts/vif-bridge'/>
+      <target dev='vif1.1'/>
+    </interface>
+    <console type='pty' tty='/dev/pts/1'>
+      <source path='/dev/pts/1'/>
+      <target type='xen' port='0'/>
+    </console>
+  </devices>
+</domain>

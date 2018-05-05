@@ -75,9 +75,17 @@ module OmfEc
       block.call(app_def) if block
     end
 
+    def extract_domain(topic_name)
+      urn_parts = topic_name.split("+")
+      raise("The flowvisor topic should be in URN format") if urn_parts.size < 1
+      domain = urn_parts[1].gsub(".", "-")
+      domain
+    end
     # Define a flowvisor, create a pubsub topic for the flowvisor.
     #
     def def_flow_visor(name, topic_name, &block)
+      domain = extract_domain(topic_name)
+      topic_name = "fed-#{domain}-#{topic_name}" if OmfEc.experiment.federate
       flowvisor = OmfEc::FlowVisor::FlowVisorDescription.new(name, topic_name)
       OmfEc.experiment.add_flowvisor(flowvisor)
       block.call(flowvisor) if block
@@ -86,6 +94,8 @@ module OmfEc
     # Define a vm group, create a pubsub topic for the vm group.
     #
     def def_vm_group(name, topic_name, &block)
+      domain = extract_domain(topic_name)
+      topic_name = "fed-#{domain}-#{topic_name}" if OmfEc.experiment.federate
       vm_group = OmfEc::Vm::VmGroup.new(name, topic_name)
       OmfEc.experiment.add_vm_group(vm_group)
       block.call(vm_group) if block

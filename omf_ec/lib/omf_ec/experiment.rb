@@ -16,7 +16,7 @@ module OmfEc
 
     include MonitorMixin
 
-    attr_accessor :name, :sliceID, :oml_uri, :js_url, :ss_url, :job_url, :job_mps, :app_definitions, :property, :cmdline_properties, :show_graph, :nodes, :assertion, :vms
+    attr_accessor :name, :sliceID, :oml_uri, :js_url, :ss_url, :job_url, :job_mps, :app_definitions, :property, :cmdline_properties, :show_graph, :nodes, :assertion, :vms, :federate, :domain
     attr_reader :groups, :sub_groups, :switches, :vm_groups, :flowvisors, :slices
 
     # MP only used for injecting metadata
@@ -50,6 +50,8 @@ module OmfEc
       @job_url = nil
       @job_mps = {}
       @ss_url = nil
+      @federate = nil
+      @domain = nil
     end
 
     def state

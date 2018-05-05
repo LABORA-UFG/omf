@@ -215,6 +215,8 @@ module OmfEc
     def setup_experiment
       OmfEc.experiment.oml_uri = @config_opts[:oml_uri] if @config_opts[:oml_uri]
       OmfEc.experiment.show_graph = @config_opts['show-graph']
+      OmfEc.experiment.federate = @config_opts[:communication][:federate] if @config_opts[:communication]
+      OmfEc.experiment.domain = @config_opts[:communication][:domain] if @config_opts[:communication]
 
       # Parse assertion JSON if provided
       #

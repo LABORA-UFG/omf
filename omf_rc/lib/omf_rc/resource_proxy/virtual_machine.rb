@@ -232,7 +232,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   BROKER_STATUS_CREATION_ERROR = 'CREATION_ERROR'
 
   property :action, :default => :stop
-  property :state, :default => :stopped
+  property :state, :default => 'DOWN'
   property :ready, :default => false
   property :enable_omf, :default => true
   property :vm_name, :default => "#{VM_NAME_DEFAULT_PREFIX}_#{Time.now.to_i}"
@@ -383,6 +383,7 @@ module OmfRc::ResourceProxy::VirtualMachine
 
     if vm_state.include? "Domain not found"
       res.set_broker_info({:status => BROKER_STATUS_CREATING})
+      res.property.state = BROKER_STATUS_CREATING
       mac_address = res.send("build_img_with_#{res.property.img_builder}")
 
       res.property.vm_topic = mac_address
@@ -393,6 +394,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       # ----Setting up broker vm info ----
       is_created = !(res.property.vm_topic.include? "error:")
       status = is_created ? BROKER_STATUS_BOOTING : BROKER_STATUS_CREATION_ERROR
+      res.property.state = status
       broker_info = {
           :status => status
       }
@@ -473,12 +475,14 @@ module OmfRc::ResourceProxy::VirtualMachine
 
     if vm_state == "running"
       res.set_broker_info({:status => BROKER_STATUS_SHOOTING_DOWN})
+      res.property.state = BROKER_STATUS_SHOOTING_DOWN
       res.send("stop_vm_with_#{res.property.virt_mngt}")
     else
       res.log_inform_warn "Cannot stop VM: it is not running "+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
     end
     res.set_broker_info({:status => BROKER_STATUS_DOWN})
+    res.property.state = BROKER_STATUS_DOWN
   end
 
   work :run_vm do |res|
@@ -486,6 +490,7 @@ module OmfRc::ResourceProxy::VirtualMachine
 
     if vm_state == "shut off"
       res.set_broker_info({:status => BROKER_STATUS_BOOTING})
+      res.property.state = BROKER_STATUS_BOOTING
       res.send("run_vm_with_#{res.property.virt_mngt}")
 
       # Start boot monitoring

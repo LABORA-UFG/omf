@@ -142,6 +142,7 @@ class OmfRc::ResourceProxy::AbstractResource
     @topics = []
     @membership_topics = {}
     @property = Hashie::Mash.new
+    @property.state = "INITIALIZED"
 
     OmfCommon.comm.subscribe(@uid, routing_key: "o.op") do |t|
       @topics << t
@@ -721,7 +722,7 @@ class OmfRc::ResourceProxy::AbstractResource
   #
   # @return [Hash]
   def to_hash
-    { uid: @uid, address: resource_address() }
+    { uid: @uid, address: resource_address(), state: @property.state }
   end
 
   private

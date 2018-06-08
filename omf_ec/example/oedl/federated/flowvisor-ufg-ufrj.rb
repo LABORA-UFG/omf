@@ -26,12 +26,12 @@ defFlowVisor('fv_noc', FLOWVISOR_TOPIC_NOC) do |flowvisor|
       flow1.device = '00:00:00:04:df:61:5d:3a'
       flow1.match = 'in_port=40,dl_vlan=101'
     end
-    slice1.addFlow('noc3-noc2') do |flow1|
+    slice1.addFlow('noc2-noc3') do |flow1|
       flow1.operation = 'add'
       flow1.device = '00:00:00:04:df:61:5d:3a'
       flow1.match = 'in_port=2,dl_vlan=101'
     end
-    slice1.addFlow('noc2-noc3') do |flow1|
+    slice1.addFlow('noc3-noc2') do |flow1|
       flow1.operation = 'add'
       flow1.device = '00:00:00:01:0a:00:00:46'
       flow1.match = 'in_port=136,dl_vlan=101'
@@ -116,3 +116,7 @@ onEvent(:ALL_FLOWVISOR_UP) do |event|
   end
 
 end
+
+# ifconfig eth1.101 192.137.11.216 netmask 255.0.0.0
+# ifconfig eth1.101 192.129.11.229 netmask 255.0.0.0
+# 0feliafv123

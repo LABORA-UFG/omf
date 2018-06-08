@@ -722,7 +722,9 @@ class OmfRc::ResourceProxy::AbstractResource
   #
   # @return [Hash]
   def to_hash
-    { uid: @uid, address: resource_address(), state: @property.state }
+    hash = { uid: @uid, address: resource_address(), state: @property.state }
+    hash[:label] = @property.label if @property.label
+    hash
   end
 
   private

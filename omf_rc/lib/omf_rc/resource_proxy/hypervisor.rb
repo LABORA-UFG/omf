@@ -32,7 +32,7 @@
 # This VM Factory Proxy is the resource entity that can create VM Proxies.
 # @see OmfRc::ResourceProxy::VirtualMachine
 #
-module OmfRc::ResourceProxy::Hipervisor
+module OmfRc::ResourceProxy::Hypervisor
   include OmfRc::ResourceProxyDSL
 
   register_proxy :hypervisor

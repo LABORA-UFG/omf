@@ -123,6 +123,14 @@ module OmfEc::Vm
                 info "vm: #{@name} progress #{msg.properties[:progress]}"
               elsif msg.itype == "VM.TOPIC"
                 @vm_node.subscribe(msg.properties[:vm_topic]) do
+                  @vm_node.topic.request([:status]) do |vm_node_msg|
+                    if vm_node_msg[:status] and vm_node_msg[:status] == "UP_AND_READY"
+                      info "vm: #{@name} boot up and ready."
+                      self.configure_params
+                      @vm_state_up = true
+                      block.call if block
+                    end
+                  end
                   @vm_node.topic.on_message do |vm_node_msg|
                     if vm_node_msg.itype == 'BOOT.INITIALIZED'
                       info "vm: #{@name} boot initialized."

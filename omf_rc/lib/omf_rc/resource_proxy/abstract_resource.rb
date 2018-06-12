@@ -144,7 +144,7 @@ class OmfRc::ResourceProxy::AbstractResource
     @property = Hashie::Mash.new
     @property.state = OmfRc::ResourceProxy::RESOURCE_PROXY_INITIALIZED
 
-    existing_child = find_children_by_uid(opts[:uid])
+    existing_child = find_children_by_uid(@uid)
 
     return existing_child if existing_child
 
@@ -261,7 +261,12 @@ class OmfRc::ResourceProxy::AbstractResource
     call_hook(:after_create, self, new_resource)
 
     self.synchronize do
-        children << new_resource unless children.include?(new_resource)
+        federate_enable = @opts[:federate]
+        if federate_enable == true and !@domain.nil? and !opts[:uid].nil?
+          uid = "fed-#{@domain}-#{opts[:uid]}"
+        end
+        existing_child = find_children_by_uid(uid)
+        children << new_resource unless existing_child
     end
     new_resource
   end
@@ -821,7 +826,7 @@ class OmfRc::ResourceProxy::AbstractResource
   end
 
   def find_children_by_uid(uid)
-    child = children.find { |v| v.uid.to_s == uid }
+    child = children.find { |v| v.uid.to_s == uid.to_s }
     child
   end
 

@@ -385,13 +385,12 @@ module OmfRc::ResourceProxy::VirtualMachine
       "have the 'overwrite' property set to true!" if res.property.ready
 
     vm_state = res.check_vm_state(res)
-    mac_address = ""
     vm_was_stopped = false
 
     if vm_state == STATE_NOT_CREATED
       res.set_broker_info({:status => BROKER_STATUS_CREATING})
       res.property.state = BROKER_STATUS_CREATING
-      mac_address = res.send("build_img_with_#{res.property.img_builder}")
+      res.send("build_img_with_#{res.property.img_builder}")
     elsif vm_state == STATE_RUNNING
       res.inform(:ALREADY_CREATED, {:message => "VM #{res.property.vm_name} already exist and it is running"})
     else
@@ -410,6 +409,7 @@ module OmfRc::ResourceProxy::VirtualMachine
         :status => status
     }
     if is_created
+      mac_address = res.get_mac_addr(res.property.vm_name)
       broker_info[:mac_address] = mac_address
     end
     res.set_broker_info(broker_info)
@@ -591,6 +591,9 @@ module OmfRc::ResourceProxy::VirtualMachine
             error = "Could not subscribe to broker topic"
             resource.log_inform_error(error)
           else
+            topic.request([:status]) do |msg|
+              started = msg[:status] == "UP_AND_READY"
+            end
             topic.on_message do |msg|
               if msg.itype == 'BOOT.INITIALIZED' || msg.itype == 'BOOT.DONE'
                 started = true

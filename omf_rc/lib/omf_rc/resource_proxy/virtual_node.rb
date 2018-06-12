@@ -11,6 +11,7 @@ module OmfRc::ResourceProxy::VirtualNode
 
   property :if_name, :default => "eth0"
   property :broker_topic_name, :default => "am_controller"
+  property :status
 
   @broker_topic = nil
   @vm_topic = nil
@@ -86,6 +87,10 @@ module OmfRc::ResourceProxy::VirtualNode
 
   request :vm_mac do |resource|
     resource.check_and_return_request(@vm_mac)
+  end
+
+  request :status do |resource|
+    resource.property.status
   end
 
   # Checks if resource is ready to receive configure commands
@@ -172,16 +177,16 @@ module OmfRc::ResourceProxy::VirtualNode
     unless @vm_topic.nil?
       @started = true
       ip_address = resource.request_vm_ip
-      status = 'UP_AND_READY'
+      resource.property.status = 'UP_AND_READY'
 
-      info_msg = "Setting vm status on broker to '#{status}' and ip address to '#{ip_address}'"
+      info_msg = "Setting vm status on broker to '#{resource.property.status}' and ip address to '#{ip_address}'"
       resource.inform(:info, Hashie::Mash.new({:info => info_msg}))
 
-      @vm_topic.configure(status: status, ip_address: ip_address) do |msg|
+      @vm_topic.configure(status: resource.property.status, ip_address: ip_address) do |msg|
         if msg.error?
           resource.inform_error("Could not finish vm setup with broker: #{msg}")
         else
-          resource.inform(:BOOT_DONE, Hashie::Mash.new({:status => status, ip_address: ip_address}))
+          resource.inform(:BOOT_DONE, Hashie::Mash.new({:status => resource.property.status, ip_address: ip_address}))
           resource.call_prev_configs
         end
       end

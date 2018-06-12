@@ -97,7 +97,6 @@ module OmfRc::ResourceProxy::Hypervisor
   hook :after_create do |res, child_res|
     logger.info "Created new child VM: #{child_res.uid}"
     res.property.vm_list << child_res.uid
-    child_res.check_vm_state(child_res)
   end
 
   # Return a hash describing a reference to this object
@@ -118,12 +117,13 @@ module OmfRc::ResourceProxy::Hypervisor
         c.check_vm_state(c) if c.respond_to?(:check_vm_state)
       end
       if c.property.key?(:label)
-        {c.property.label => c.property.state}
+        {c.property.label => c.check_vm_state(c)} if c.respond_to?(:check_vm_state)
       else
         c.property.state
       end
     }
   end
+
 
 
 end

@@ -142,7 +142,11 @@ class OmfRc::ResourceProxy::AbstractResource
     @topics = []
     @membership_topics = {}
     @property = Hashie::Mash.new
-    @property.state = "INITIALIZED"
+    @property.state = OmfRc::ResourceProxy::RESOURCE_PROXY_INITIALIZED
+
+    existing_child = find_children_by_uid(opts[:uid])
+
+    return existing_child if existing_child
 
     OmfCommon.comm.subscribe(@uid, routing_key: "o.op") do |t|
       @topics << t
@@ -257,7 +261,7 @@ class OmfRc::ResourceProxy::AbstractResource
     call_hook(:after_create, self, new_resource)
 
     self.synchronize do
-      children << new_resource
+        children << new_resource unless children.include?(new_resource)
     end
     new_resource
   end
@@ -815,4 +819,10 @@ class OmfRc::ResourceProxy::AbstractResource
   def log_metadata(key, value, domain)
     OmfRc::MetaData.inject(domain.to_s, key.to_s, value.to_s)
   end
+
+  def find_children_by_uid(uid)
+    child = children.find { |v| v.uid.to_s == uid }
+    child
+  end
+
 end

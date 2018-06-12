@@ -8,7 +8,9 @@ require 'omf_rc/version'
 require 'macaddr'
 
 module OmfRc
-  module ResourceProxy; end
+  module ResourceProxy
+    RESOURCE_PROXY_INITIALIZED = "RESOURCE_PROXY_INITIALIZED"
+  end
   module Util; end
 end
 

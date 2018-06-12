@@ -224,6 +224,11 @@ module OmfRc::ResourceProxy::VirtualMachine
                 topic: nil
                 })
 
+  # VM States
+  STATE_NOT_CREATED = 'NOT_CREATED'
+  STATE_DOWN = 'DOWN'
+  STATE_RUNNING = 'RUNNING'
+
   # Broker status
   BROKER_STATUS_BOOTING = 'BOOTING'
   BROKER_STATUS_SHOOTING_DOWN = 'SHOOTING_DOWN'
@@ -298,7 +303,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   end
 
   request :state do |res|
-    res.send("check_state_vm")
+    res.send("check_vm_state")
   end
 
   # Checks if resource is ready to receive configure commands
@@ -379,41 +384,42 @@ module OmfRc::ResourceProxy::VirtualMachine
     res.log_inform_warn "Trying to build an already built VM, make sure to "+
       "have the 'overwrite' property set to true!" if res.property.ready
 
-    vm_state = res.check_state_vm(res)
+    vm_state = res.check_vm_state(res)
+    mac_address = ""
+    vm_was_stopped = false
 
-    if vm_state.include? "Domain not found"
+    if vm_state == STATE_NOT_CREATED
       res.set_broker_info({:status => BROKER_STATUS_CREATING})
       res.property.state = BROKER_STATUS_CREATING
       mac_address = res.send("build_img_with_#{res.property.img_builder}")
-
-      res.property.vm_topic = mac_address
-      if res.property.federate
-        res.property.vm_topic = "fed-#{res.property.domain}-#{mac_address}"
-      end
-
-      # ----Setting up broker vm info ----
-      is_created = !(res.property.vm_topic.include? "error:")
-      status = is_created ? BROKER_STATUS_BOOTING : BROKER_STATUS_CREATION_ERROR
-      res.property.state = status
-      broker_info = {
-          :status => status
-      }
-      if is_created
-        broker_info[:mac_address] = mac_address
-      end
-      res.set_broker_info(broker_info)
-      # ---- end broker integration ----
-
-      if is_created
-        res.start_booting_monitor(res.property.vm_topic)
-        res.inform(:VM_TOPIC, Hashie::Mash.new({:vm_topic => "#{res.property.vm_topic}"}))
-      else
-        res.log_inform_error "Could not build VM: #{mac_address}"
-      end
+    elsif vm_state == STATE_RUNNING
+      res.inform(:ALREADY_CREATED, {:message => "VM #{res.property.vm_name} already exist and it is running"})
     else
-      res.log_inform_error "Cannot build VM image: it is not stopped"+
-        "(name: '#{res.property.vm_name}' - state: #{res.property.state} "+
-        "- path: '#{res.property.image_path}')"
+      res.inform(:ALREADY_CREATED, {:message => "VM #{res.property.vm_name} already exist, but it is stopped. Starting it now..."})
+      res.run_vm(res)
+      vm_was_stopped = true
+    end
+
+    res.property.vm_topic = res.get_vm_node_topic
+
+    # ----Setting up broker vm info ----
+    is_created = !(res.property.vm_topic.include? "error:")
+    status = is_created ? BROKER_STATUS_BOOTING : BROKER_STATUS_CREATION_ERROR
+    res.property.state = STATE_RUNNING
+    broker_info = {
+        :status => status
+    }
+    if is_created
+      broker_info[:mac_address] = mac_address
+    end
+    res.set_broker_info(broker_info)
+    # ---- end broker integration ----
+
+    if is_created
+      res.start_booting_monitor(res.property.vm_topic) unless vm_was_stopped
+      res.inform(:VM_TOPIC, Hashie::Mash.new({:vm_topic => "#{res.property.vm_topic}"}))
+    else
+      res.log_inform_error "Could not build VM: #{mac_address}"
     end
   end
 
@@ -423,9 +429,9 @@ module OmfRc::ResourceProxy::VirtualMachine
           "'#{res.property.vm_name}'): definition path not set "+
           "or file does not exist (path: '#{res.property.vm_definition}')"
     else
-      vm_state = res.check_state_vm(res)
+      vm_state = res.check_vm_state(res)
 
-      if vm_state == "shut off"
+      if vm_state == STATE_DOWN
         res.property.ready = res.send("define_vm_with_#{res.property.virt_mngt}")
         res.inform(:status, Hashie::Mash.new({:status => {:ready => res.property.ready}}))
       else
@@ -440,9 +446,9 @@ module OmfRc::ResourceProxy::VirtualMachine
         res.log_inform_error "Cannot attach VM, name not set"+
           "(name: '#{res.property.vm_name})'"
     else
-      vm_state = res.check_state_vm(res)
+      vm_state = res.check_vm_state(res)
 
-      if vm_state == "shut off"
+      if vm_state == STATE_DOWN
         res.property.ready = res.send("attach_vm_with_#{res.property.virt_mngt}")
         res.inform(:status, Hashie::Mash.new({:status => {:ready => res.property.ready}}))
       else
@@ -458,9 +464,9 @@ module OmfRc::ResourceProxy::VirtualMachine
       res.log_inform_error "Cannot clone VM: name or directory not set "+
         "(name: '#{res.property.vm_name}' - dir: '#{res.property.image_directory}')"
     else
-      vm_state = res.check_state_vm(res)
+      vm_state = res.check_vm_state(res)
 
-      if vm_state == "shut off"
+      if vm_state == STATE_DOWN
         res.property.ready = res.send("clone_vm_with_#{res.property.virt_mngt}")
         res.inform(:status, Hashie::Mash.new({:status => {:ready => res.property.ready}}))
       else
@@ -471,9 +477,9 @@ module OmfRc::ResourceProxy::VirtualMachine
   end
 
   work :stop_vm do |res|
-    vm_state = res.check_state_vm(res)
+    vm_state = res.check_vm_state(res)
 
-    if vm_state == "running"
+    if vm_state == STATE_RUNNING
       res.set_broker_info({:status => BROKER_STATUS_SHOOTING_DOWN})
       res.property.state = BROKER_STATUS_SHOOTING_DOWN
       res.send("stop_vm_with_#{res.property.virt_mngt}")
@@ -486,16 +492,16 @@ module OmfRc::ResourceProxy::VirtualMachine
   end
 
   work :run_vm do |res|
-    vm_state = res.check_state_vm(res)
+    vm_state = res.check_vm_state(res)
 
-    if vm_state == "shut off"
+    if vm_state == STATE_DOWN
       res.set_broker_info({:status => BROKER_STATUS_BOOTING})
-      res.property.state = BROKER_STATUS_BOOTING
+      res.property.state = STATE_RUNNING
       res.send("run_vm_with_#{res.property.virt_mngt}")
 
       # Start boot monitoring
-      vm_topic = res.get_mac_addr(res.property.vm_name)
-      res.start_booting_monitor(vm_topic)
+      res.property.vm_topic = res.get_vm_node_topic
+      res.start_booting_monitor(res.property.vm_topic)
     else
       res.log_inform_warn "Cannot run VM: it is not stopped or ready yet "+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
@@ -503,9 +509,9 @@ module OmfRc::ResourceProxy::VirtualMachine
   end
 
   work :delete_vm do |res|
-    vm_state = res.check_state_vm(res)
+    vm_state = res.check_vm_state(res)
 
-    if vm_state == "shut off"
+    if vm_state == STATE_DOWN
       res.send("delete_vm_with_#{res.property.virt_mngt}")
     else
       res.log_inform_warn "Cannot delete VM: it is not stopped or ready yet "+
@@ -514,9 +520,17 @@ module OmfRc::ResourceProxy::VirtualMachine
     end
   end
 
-  work :check_state_vm do |res|
-    result = res.send("check_vm_state_with_#{res.property.virt_mngt}")
-    result
+  work :check_vm_state do |res|
+    vm_state = res.send("check_vm_state_with_#{res.property.virt_mngt}")
+    if vm_state.include? "Domain not found"
+      vm_state = STATE_NOT_CREATED
+    elsif vm_state == "shut off"
+      vm_state = STATE_DOWN
+    elsif vm_state == "running" or vm_state == "idle"
+      vm_state = STATE_RUNNING
+    end
+    res.property.state = vm_state.upcase
+    vm_state
   end
 
   work :get_vm_opts do |resource|
@@ -596,5 +610,14 @@ module OmfRc::ResourceProxy::VirtualMachine
         end
       }
     end
+  end
+
+  work :get_vm_node_topic do |res|
+    vm_topic = res.get_mac_addr(res.property.vm_name)
+    vm_topic
+    if res.property.federate
+      vm_topic = "fed-#{res.property.domain}-#{vm_topic}"
+    end
+    vm_topic
   end
 end

@@ -81,6 +81,7 @@ module OmfRc::ResourceProxy::Hypervisor
       raise 'You need to inform the virtual machine label' if opts[:label].nil?
       opts[:broker_topic_name] = res.property.broker_topic_name
       opts[:vm_name] = opts[:label]
+      opts[:uid] =  opts[:label]
       opts[:image_directory] = res.property.image_directory
       opts[:image_template_path] = res.property.image_template_path
       opts[:image_path] = "#{opts[:image_directory]}/#{opts[:label]}"
@@ -97,5 +98,31 @@ module OmfRc::ResourceProxy::Hypervisor
     logger.info "Created new child VM: #{child_res.uid}"
     res.property.vm_list << child_res.uid
   end
+
+  # Return a hash describing a reference to this object
+  #
+  # @return [Hash]
+  def to_hash
+    hash = super.to_hash
+    hash[:label] = @property.label if @property.label
+    hash
+  end
+
+  # Request child resources
+  #
+  # @return [Hashie::Mash] child resource mash with uid and hrn
+  def request_child_resources(*args)
+    children.map { |c|
+      if c.property.state == OmfRc::ResourceProxy::RESOURCE_PROXY_INITIALIZED
+        c.check_vm_state(c) if c.respond_to?(:check_vm_state)
+      end
+      if c.property.key?(:label)
+        {c.property.label => c.property.state}
+      else
+        c.property.state
+      end
+    }
+  end
+
 
 end

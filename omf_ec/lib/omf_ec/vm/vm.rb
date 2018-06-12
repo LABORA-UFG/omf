@@ -117,9 +117,11 @@ module OmfEc::Vm
           if build_msg.success?
             info "vm: #{@name} - wait receive the message of creation and boot (initialized and done)"
             @vm_topic.on_message do |msg|
-              if msg.itype == "CREATION.PROGRESS"
+              if msg.itype == "ALREADY.CREATED"
+                info "vm: #{@name} already exist"
+              elsif msg.itype == "CREATION.PROGRESS"
                 info "vm: #{@name} progress #{msg.properties[:progress]}"
-              elsif msg.itype == 'VM.TOPIC'
+              elsif msg.itype == "VM.TOPIC"
                 @vm_node.subscribe(msg.properties[:vm_topic]) do
                   @vm_node.topic.on_message do |vm_node_msg|
                     if vm_node_msg.itype == 'BOOT.INITIALIZED'

@@ -1,0 +1,15 @@
+# Systemd OMF Resource Controller service
+[Unit]
+Description=OMF6 Resource Controller
+After=syslog.target
+After=network-online.target
+
+[Service]
+Type=forking
+PIDFile=/var/run/omf-rc.pid
+ExecStartPre=/bin/rm -f /var/run/omf-rc.pid
+ExecStart=/usr/local/bin/run_omf_rc.sh 2>&1 | logger -t omf_rc
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target

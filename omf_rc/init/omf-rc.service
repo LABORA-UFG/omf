@@ -5,7 +5,7 @@ After=syslog.target
 After=network-online.target
 
 [Service]
-Type=forking
+Type=simple
 PIDFile=/var/run/omf-rc.pid
 ExecStartPre=/bin/rm -f /var/run/omf-rc.pid
 ExecStart=/bin/sh -c '/usr/local/bin/run_omf_rc.sh 2>&1 | logger -t omf_rc'

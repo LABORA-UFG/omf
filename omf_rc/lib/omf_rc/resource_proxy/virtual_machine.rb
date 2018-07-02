@@ -252,6 +252,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :domain, :default => ''
   property :image_path
   property :imOk, :default => false
+  property :force_new, :default => false
 
   hook :before_ready do |resource|
     parent = resource.opts.parent
@@ -387,6 +388,12 @@ module OmfRc::ResourceProxy::VirtualMachine
     vm_state = res.check_vm_state(res)
     vm_was_stopped = false
 
+    if vm_state != STATE_NOT_CREATED and res.property.force_new
+      res.inform(:ALREADY_CREATED, {:message => "VM #{res.property.vm_name} already exist. Forcing its deletion to create a new one."})
+      res.send("delete_vm_with_#{res.property.virt_mngt}", res.property.vm_name, res.property.image_path)
+      vm_state = STATE_NOT_CREATED
+    end
+
     if vm_state == STATE_NOT_CREATED
       res.set_broker_info({:status => BROKER_STATUS_CREATING})
       res.property.state = BROKER_STATUS_CREATING
@@ -512,7 +519,7 @@ module OmfRc::ResourceProxy::VirtualMachine
     vm_state = res.check_vm_state(res)
 
     if vm_state == STATE_DOWN
-      res.send("delete_vm_with_#{res.property.virt_mngt}")
+      res.send("delete_vm_with_#{res.property.virt_mngt}", res.property.vm_name, res.property.image_path)
     else
       res.log_inform_warn "Cannot delete VM: it is not stopped or ready yet "+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state} "+

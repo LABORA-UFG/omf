@@ -71,9 +71,10 @@ module OmfRc::Util::Libvirt
                     "Cannot run VM", "VM running now!")
   end
 
-  work :delete_vm_with_libvirt do |res|
-    cmd = "#{VIRSH} -c #{res.property.hypervisor_uri} "+
-        "undefine #{res.property.vm_name} ; rm -rf #{res.property.image_path}"
+  work :delete_vm_with_libvirt do |res, vm_name, image_path|
+    cmd = "#{VIRSH} -c #{res.property.hypervisor_uri} destroy #{vm_name}" #destroy VM
+    cmd = "#{cmd} && #{VIRSH} -c #{res.property.hypervisor_uri} undefine #{vm_name}" #undefine VM
+    cmd = "#{cmd} && rm -rf #{image_path}" #delete VM disk
     res.execute_cmd(cmd, "Deleting VM",
                     "Cannot delete VM", "VM deleted!")
   end

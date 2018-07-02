@@ -12,14 +12,14 @@ module OmfEc::Vm
     include MonitorMixin
 
     attr_accessor :id, :name, :vm_group
-    attr_accessor :ram, :cpu, :bridges, :image, :net_ifs
+    attr_accessor :ram, :cpu, :bridges, :image, :net_ifs, :force_new
     attr_reader :vm_topic, :vm_node
     attr_reader :conf_params, :vlans, :users, :req_params, :params, :vm_state_up
 
     # @param [String] name name of virtual machine
     # @param [VmGroup] vm_group
     # @param [Object] block
-    def initialize(name, vm_group, &block)
+    def initialize(name, force_new, vm_group, &block)
       super()
       unless vm_group.kind_of? OmfEc::Vm::VmGroup
         raise ArgumentError, "Expect VmGroup object, got #{vm_group.inspect}"
@@ -27,6 +27,7 @@ module OmfEc::Vm
       #
       @id = "#{OmfEc.experiment.id}.#{name}"
       @name = name
+      @force_new = force_new
       @vm_group = vm_group
       @vm_node = OmfEc::Vm::VmNode.new(name, self)
 
@@ -83,7 +84,7 @@ module OmfEc::Vm
 
         @is_waiting_ok = true
         already_received = false
-        @vm_group.create_vm(@name) do |vm_topic|
+        @vm_group.create_vm(@name, @force_new) do |vm_topic|
           # Wait until receive VM.IMOK message...
           vm_topic.on_message do |msg|
             debug "Message received on topic: #{msg.itype}" unless msg.nil? or msg.itype.nil?
@@ -108,17 +109,17 @@ module OmfEc::Vm
     #   vm1.create do
     #     info "vm1 created"
     #   end
-    def create(&block)
+    def create(force_new=false, &block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.vm_group.has_topic
       # create the vm in hypervisor
       self.recv_vm_topic do
         opts = {bridges: self.bridges}
-        @vm_topic.configure(vm_opts: opts, action: :build) do |build_msg|
+        @vm_topic.configure(vm_opts: opts, force_new: force_new, action: :build) do |build_msg|
           if build_msg.success?
             info "vm: #{@name} - wait receive the message of creation and boot (initialized and done)"
             @vm_topic.on_message do |msg|
               if msg.itype == "ALREADY.CREATED"
-                info "vm: #{@name} already exist"
+                info "vm #{@name} already exist. Message: #{msg[:message]}"
               elsif msg.itype == "CREATION.PROGRESS"
                 info "vm: #{@name} progress #{msg.properties[:progress]}"
               elsif msg.itype == "VM.TOPIC"

@@ -254,19 +254,26 @@ class OmfRc::ResourceProxy::AbstractResource
 
     call_hook(:before_create, self, type, opts)
 
-    new_resource = OmfRc::ResourceFactory.create(type.to_sym, opts, creation_opts, &creation_callback)
+    uid = opts[:uid]
+    force_new = opts[:force_new]
+    federate_enable = @opts[:federate]
+    if federate_enable == true and !@domain.nil? and !opts[:uid].nil?
+      uid = "fed-#{@domain}-#{opts[:uid]}"
+    end
+    existing_child = find_children_by_uid(uid)
+    if existing_child and not force_new
+      new_resource = existing_child
+      creation_callback.call(new_resource) if creation_callback
+    else
+      new_resource = OmfRc::ResourceFactory.create(type.to_sym, opts, creation_opts, &creation_callback)
+    end
 
     log_metadata(self.uid, new_resource.uid, :create)
 
     call_hook(:after_create, self, new_resource)
 
     self.synchronize do
-        federate_enable = @opts[:federate]
-        if federate_enable == true and !@domain.nil? and !opts[:uid].nil?
-          uid = "fed-#{@domain}-#{opts[:uid]}"
-        end
-        existing_child = find_children_by_uid(uid)
-        children << new_resource unless existing_child
+      children << new_resource unless existing_child
     end
     new_resource
   end

@@ -37,6 +37,7 @@ module OmfRc::ResourceProxy::Hypervisor
 
   register_proxy :hypervisor
   utility :common_tools
+  utility :libvirt
 
   # Default VirtualMachine to use
   HYPERVISOR_DEFAULT = :kvm
@@ -84,19 +85,38 @@ module OmfRc::ResourceProxy::Hypervisor
       opts[:uid] =  opts[:label]
       opts[:image_directory] = res.property.image_directory
       opts[:image_template_path] = res.property.image_template_path
-      opts[:image_path] = "#{opts[:image_directory]}/#{opts[:label]}"
+      opts[:image_path] = "#{opts[:image_directory]}/#{opts[:label]}.img"
       opts[:boot_timeout] = res.property.boot_timeout
       opts[:federate] = res.property.federate
       opts[:domain] = res.property.domain
       opts[:ssh_params] = res.property.ssh_params
+      res.destroy_old_vm(opts[:vm_name], opts[:image_path]) if opts[:force_new]
     else
       raise "This resource only creates VM! (Cannot create a resource: #{type})"
     end
   end
 
   hook :after_create do |res, child_res|
-    logger.info "Created new child VM: #{child_res.uid}"
-    res.property.vm_list << child_res.uid
+    existing_vm = res.find_vm_by_uid(child_res.uid)
+    if existing_vm
+      child_res.property.imOk = false
+      Thread.new {
+        debug "Starting VM_IMOK inform send to OMF_EC until a configure message is not received..."
+        until child_res.property.imOk
+          debug "Sending VM_IMOK message..."
+          sleep 1
+          child_res.inform(:VM_IMOK, {:info => "I am Ok"})
+        end
+        debug "Configure received, stopping VM_IMOK messages sending..."
+      }
+    else
+      logger.info "Created new child VM: #{child_res.uid}"
+      res.property.vm_list << child_res.uid
+    end
+  end
+
+  work :destroy_old_vm do |res, vm_name, image_path|
+    res.send("delete_vm_with_#{res.property.virt_mngt}", vm_name, image_path)
   end
 
   # Return a hash describing a reference to this object
@@ -124,6 +144,10 @@ module OmfRc::ResourceProxy::Hypervisor
     }
   end
 
+  work :find_vm_by_uid do |res, uid|
+    vm = res.property.vm_list.find { |vm_uid| vm_uid.to_s == uid.to_s }
+    vm
+  end
 
 
 end

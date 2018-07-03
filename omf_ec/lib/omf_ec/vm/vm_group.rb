@@ -44,9 +44,9 @@ module OmfEc::Vm
     # Add a virtual machine in hypervisor.
     #
     # @param [String] name of virtual machine.
-    def addVm(name, force_new=false, &block)
+    def addVm(name, &block)
       self.synchronize do
-        vm = OmfEc::Vm::VirtualMachine.new(name, force_new, self)
+        vm = OmfEc::Vm::VirtualMachine.new(name, self)
         if @vms.find {|v| v.name == name}
           error "vm: #{name} - already added."
         else
@@ -61,9 +61,9 @@ module OmfEc::Vm
     #
     # @param [Object] name of virtual machine.
     # @param [Object] block
-    def create_vm(name, force_new, &block)
+    def create_vm(name, &block)
       raise('This function need to be executed after ALL_VM_GROUPS_UP event') unless self.has_topic
-      @topic.create(:virtual_machine, {:label => name, :force_new => force_new}) do |vm|
+      @topic.create(:virtual_machine, {:label => name}) do |vm|
         vm_topic = vm.resource
         if vm_topic.error?
           error app.inspect

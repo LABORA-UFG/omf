@@ -12,14 +12,14 @@ module OmfEc::Vm
     include MonitorMixin
 
     attr_accessor :id, :name, :vm_group
-    attr_accessor :ram, :cpu, :bridges, :image, :net_ifs, :force_new
+    attr_accessor :ram, :cpu, :bridges, :image, :net_ifs
     attr_reader :vm_topic, :vm_node
     attr_reader :conf_params, :vlans, :users, :req_params, :params, :vm_state_up
 
     # @param [String] name name of virtual machine
     # @param [VmGroup] vm_group
     # @param [Object] block
-    def initialize(name, force_new, vm_group, &block)
+    def initialize(name, vm_group, &block)
       super()
       unless vm_group.kind_of? OmfEc::Vm::VmGroup
         raise ArgumentError, "Expect VmGroup object, got #{vm_group.inspect}"
@@ -27,7 +27,6 @@ module OmfEc::Vm
       #
       @id = "#{OmfEc.experiment.id}.#{name}"
       @name = name
-      @force_new = force_new
       @vm_group = vm_group
       @vm_node = OmfEc::Vm::VmNode.new(name, self)
 
@@ -84,7 +83,7 @@ module OmfEc::Vm
 
         @is_waiting_ok = true
         already_received = false
-        @vm_group.create_vm(@name, @force_new) do |vm_topic|
+        @vm_group.create_vm(@name) do |vm_topic|
           # Wait until receive VM.IMOK message...
           vm_topic.on_message do |msg|
             debug "Message received on topic: #{msg.itype}" unless msg.nil? or msg.itype.nil?

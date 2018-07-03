@@ -90,7 +90,6 @@ module OmfRc::ResourceProxy::Hypervisor
       opts[:federate] = res.property.federate
       opts[:domain] = res.property.domain
       opts[:ssh_params] = res.property.ssh_params
-      res.destroy_old_vm(opts[:vm_name], opts[:image_path]) if opts[:force_new]
     else
       raise "This resource only creates VM! (Cannot create a resource: #{type})"
     end
@@ -113,10 +112,6 @@ module OmfRc::ResourceProxy::Hypervisor
       logger.info "Created new child VM: #{child_res.uid}"
       res.property.vm_list << child_res.uid
     end
-  end
-
-  work :destroy_old_vm do |res, vm_name, image_path|
-    res.send("delete_vm_with_#{res.property.virt_mngt}", vm_name, image_path)
   end
 
   # Return a hash describing a reference to this object

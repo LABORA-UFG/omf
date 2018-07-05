@@ -253,6 +253,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :image_path
   property :imOk, :default => false
   property :force_new, :default => false
+  property :monitoring_vm_state, :default => false
 
   hook :before_ready do |resource|
     parent = resource.opts.parent
@@ -386,7 +387,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       "have the 'overwrite' property set to true!" if res.property.ready
 
     vm_state = res.check_vm_state(res)
-    vm_was_stopped = false
+    vm_is_running = false
 
     if vm_state != STATE_NOT_CREATED and res.property.force_new
       res.inform(:ALREADY_CREATED, {:message => "VM #{res.property.vm_name} already exist. Forcing its deletion to create a new one."})
@@ -400,10 +401,11 @@ module OmfRc::ResourceProxy::VirtualMachine
       res.send("build_img_with_#{res.property.img_builder}")
     elsif vm_state == STATE_RUNNING
       res.inform(:ALREADY_CREATED, {:message => "VM #{res.property.vm_name} already exist and it is running"})
+      vm_is_running = true
     else
       res.inform(:ALREADY_CREATED, {:message => "VM #{res.property.vm_name} already exist, but it is stopped. Starting it now..."})
       res.run_vm(res)
-      vm_was_stopped = true
+      vm_is_running = true
     end
 
     res.property.vm_topic = res.get_vm_node_topic
@@ -419,11 +421,12 @@ module OmfRc::ResourceProxy::VirtualMachine
       mac_address = res.get_mac_addr(res.property.vm_name)
       broker_info[:mac_address] = mac_address
     end
-    res.set_broker_info(broker_info)
+    res.set_broker_info(broker_info) unless vm_is_running
     # ---- end broker integration ----
 
     if is_created
-      res.start_booting_monitor(res.property.vm_topic) unless vm_was_stopped
+      res.start_booting_monitor(res.property.vm_topic) unless vm_is_running
+      res.update_vm_state(res) unless res.property.monitoring_vm_state
       res.inform(:VM_TOPIC, Hashie::Mash.new({:vm_topic => "#{res.property.vm_topic}"}))
     else
       res.log_inform_error "Could not build VM: #{mac_address}"
@@ -509,6 +512,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       # Start boot monitoring
       res.property.vm_topic = res.get_vm_node_topic
       res.start_booting_monitor(res.property.vm_topic)
+      res.update_vm_state(res)
     else
       res.log_inform_warn "Cannot run VM: it is not stopped or ready yet "+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
@@ -560,6 +564,10 @@ module OmfRc::ResourceProxy::VirtualMachine
         resource.call_prev_configures
       end
     end
+  end
+
+  configure :update_status do |res, opts|
+    res.set_broker_info({:status => res.property.state})
   end
 
   work :set_broker_info do |resource, broker_info|
@@ -620,6 +628,20 @@ module OmfRc::ResourceProxy::VirtualMachine
         end
       }
     end
+  end
+
+  work :update_vm_state do |res|
+    res.property.monitoring_vm_state = true
+    Thread.new {
+      while(res.property.monitoring_vm_state) do
+        debug "update_vm_state: Updating VM state. Thread id: #{Thread.current.object_id}"
+        old_state = res.property.state
+        state = res.check_vm_state(res)
+        res.set_broker_info({:status => res.property.state}) if state == STATE_DOWN and old_state != STATE_DOWN
+        res.property.monitoring_vm_state = false if state == STATE_DOWN and old_state != STATE_DOWN
+        sleep 5
+      end
+    }
   end
 
   work :get_vm_node_topic do |res|

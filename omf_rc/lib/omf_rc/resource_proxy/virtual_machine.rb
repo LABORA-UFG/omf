@@ -637,8 +637,10 @@ module OmfRc::ResourceProxy::VirtualMachine
         debug "update_vm_state: Updating VM state. Thread id: #{Thread.current.object_id}"
         old_state = res.property.state
         state = res.check_vm_state(res)
-        res.set_broker_info({:status => res.property.state}) if state == STATE_DOWN and old_state != STATE_DOWN
-        res.property.monitoring_vm_state = false if state == STATE_DOWN and old_state != STATE_DOWN
+        if state == STATE_DOWN or state == STATE_NOT_CREATED and old_state != STATE_DOWN
+          res.set_broker_info({:status => res.property.state})
+          res.property.monitoring_vm_state = false
+        end
         sleep 5
       end
     }

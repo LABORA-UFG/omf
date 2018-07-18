@@ -535,9 +535,9 @@ module OmfRc::ResourceProxy::VirtualMachine
     vm_state = res.send("check_vm_state_with_#{res.property.virt_mngt}")
     if vm_state.include? "Domain not found"
       vm_state = STATE_NOT_CREATED
-    elsif vm_state == "shut off"
+    elsif vm_state.include? "shut off"
       vm_state = STATE_DOWN
-    elsif vm_state == "running" or vm_state == "idle"
+    elsif vm_state.include? "running" or vm_state.include? "idle"
       vm_state = STATE_RUNNING
     end
     res.property.state = vm_state.upcase

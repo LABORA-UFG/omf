@@ -6,7 +6,7 @@
 module OmfEc::Context
   # Holds application configuration
   class AppContext
-    attr_accessor :name, :app_def, :param_values, :oml_collections, :proto_props
+    attr_accessor :name, :orig_name, :app_def, :param_values, :oml_collections, :proto_props
 
     # Keep track of contexts for each app, i.e. multiple contexts can share
     # the same app def. This happens for example when a group can have the
@@ -24,6 +24,7 @@ module OmfEc::Context
         id = @@context_count[name]
         @@context_count[name] += 1
         self.name = "#{name}_cxt_#{id}"
+        self.orig_name = name
         @group = group
         self
       else
@@ -40,7 +41,7 @@ module OmfEc::Context
         # if this app parameter has its dynamic attribute set to true, then
         # we register a callback block to the ExperimentProperty, which will
         # be called each time the property changes its value
-        if app_def_param[key][:dynamic]
+        if app_def_param[key][:dynamic] and @group.kind_of?(OmfEc::Group)
           info "Binding dynamic parameter '#{key}' to the property '#{property_value.name}'"
           property_value.on_change do |new_value|
             info "Updating dynamic app parameter '#{key}' with value: '#{new_value}'"

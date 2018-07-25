@@ -48,6 +48,12 @@ module OmfEc
                 actual = state.count { |v| v.joined?(g.address("application")) && v[:state] == "created" }
                 results << (plan == actual) unless (plan == 0)
               end
+
+              # all_vm_groups? do |vmg|
+              #   plan = vmg.app_contexts.size * vmg.vms.size
+              #   info "Needed apps ready: #{plan} - #{state.size}"
+              # end
+
               !results.include?(false)
             end
 
@@ -129,6 +135,15 @@ module OmfEc
 
             def_event :ALL_VMS_CREATED do |state|
               all_vms_created?(state)
+            end
+
+            on_event :ALL_VMS_CREATED do
+              all_vm_groups? do |vmg|
+                # Create proxies for each apps that were added to this group
+                vmg.app_contexts.each { |a|
+                  vmg.create_application(a.orig_name, a.properties)
+                }
+              end
             end
 
             # FlowVisor

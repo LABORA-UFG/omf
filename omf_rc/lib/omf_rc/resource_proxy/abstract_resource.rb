@@ -125,12 +125,28 @@ class OmfRc::ResourceProxy::AbstractResource
 
     @type = type
     @uid = (@opts.delete(:uid) || SecureRandom.uuid).to_s
+
+    # Direct federation uid set
+    federation_set = false
     @domain = @opts[:domain]
     @domain = @domain.to_s if @domain
-    #Concat exp domain when pass federate=true
     federate_enable = @opts[:federate]
     if federate_enable == true and !@domain.nil? and !@uid.nil?
       @uid = "fed-#{@domain}-#{@uid}"
+      federation_set = true
+    end
+
+    # Heritage federation uid set
+    unless federation_set
+      parent = @opts['parent']
+      unless parent.nil?
+        parent_domain = parent.opts.domain
+        parent_domain = parent_domain.to_s if parent_domain
+        parent_fed_en = parent.opts.federate
+        if parent_fed_en === true and !parent_domain.nil? and !@uid.nil?
+          @uid = "fed-#{parent_domain}-#{@uid}"
+        end
+      end
     end
 
     @hrn = @opts.delete(:hrn)
@@ -142,7 +158,7 @@ class OmfRc::ResourceProxy::AbstractResource
     @topics = []
     @membership_topics = {}
     @property = Hashie::Mash.new
-    @property.state = OmfRc::ResourceProxy::RESOURCE_PROXY_INITIALIZED
+    @property.state = @opts.delete(:state) || OmfRc::ResourceProxy::RESOURCE_PROXY_INITIALIZED
 
     existing_child = find_children_by_uid(@uid)
 

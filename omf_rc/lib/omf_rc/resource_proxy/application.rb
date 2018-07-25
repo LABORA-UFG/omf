@@ -125,10 +125,11 @@ module OmfRc::ResourceProxy::Application
   hook :after_initial_configured do |res|
     # if state was set to running or installing from the create we need
     # to make sure that this happens!
-    if res.property.state.to_s.downcase.to_sym == :running
+    res.property.state = res.property.state.to_s.downcase.to_sym
+    if res.property.state == :running
       res.property.state = :created
       res.switch_to_running
-    elsif res.property.state.to_s.downcase.to_sym == :installing
+    elsif res.property.state == :installing
       res.property.state = :created
       res.switch_to_installing
     end

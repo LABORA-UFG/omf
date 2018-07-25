@@ -433,6 +433,7 @@ module OmfEc
 
           allVmGroups do |vmg|
             unless vmg.app_contexts.empty?
+              info "Release vm group '#{vmg.name}' applications"
               vmg.releaseApplications
             end
           end

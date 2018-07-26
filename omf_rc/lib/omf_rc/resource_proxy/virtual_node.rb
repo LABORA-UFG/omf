@@ -37,7 +37,7 @@ module OmfRc::ResourceProxy::VirtualNode
         debug "Creating broker virtual machine resource with mac_address: #{@vm_mac}"
         @broker_topic.create(:virtual_machine, {:mac_address => @vm_mac}) do |msg|
           if msg.error?
-            resource.inform_error("Could not create broker virtual machine resource topic")
+            resource.inform_error("Could not create broker virtual machine resource topic #{msg}")
           else
             @vm_topic = msg.resource
             info_msg = "Broker virtual machine resource created successfully! VM_TOPIC: #{@vm_topic}"

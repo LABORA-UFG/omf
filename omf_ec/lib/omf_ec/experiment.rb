@@ -431,12 +431,12 @@ module OmfEc
             end
           end
 
-          allVmGroups do |vmg|
-            unless vmg.app_contexts.empty?
-              info "Release vm group '#{vmg.name}' applications"
-              vmg.releaseApplications
-            end
-          end
+          # allVmGroups do |vmg|
+          #   unless vmg.app_contexts.empty?
+          #     info "Release vm group '#{vmg.name}' applications"
+          #     vmg.releaseApplications
+          #   end
+          # end
 
           OmfCommon.el.after(4) do
             info "OMF Experiment Controller #{OmfEc::VERSION} - Exit."

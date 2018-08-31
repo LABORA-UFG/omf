@@ -172,16 +172,27 @@ module OmfRc::Util::Fibre
 
     doc.root << xml_vcpu
 
+    num_disks = 0
     doc.search('//disk').each_with_index do |disk, index|
-      source = disk.at('source')
-      source['file'] = params[:disk]
-      target = disk.at('target')
-      target['dev'] = "hda"
-      target['bus'] = "ide"
-      disk.remove if index != 0
+      device_type = disk['device']
+      if device_type == 'disk'
+        source = disk.at('source')
+        source['file'] = params[:disk]
+        target = disk.at('target')
+        target['dev'] = "hda"
+        target['bus'] = "ide"
+        disk.remove if num_disks != 0
+        num_disks += 1
+      else
+        disk.remove
+      end
     end
 
     doc.search('//interface').each do |disk|
+      disk.remove
+    end
+
+    doc.search('//input').each do |disk|
       disk.remove
     end
 

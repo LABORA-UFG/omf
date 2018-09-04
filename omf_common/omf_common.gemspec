@@ -37,4 +37,5 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "oj", "= 3.3.2"
   s.add_runtime_dependency "oj_mimic_json", "= 1.0.1"
   s.add_runtime_dependency "json-jwt", "= 1.7.2"
+  s.add_runtime_dependency "highline"
 end

@@ -336,8 +336,9 @@ module OmfEc
               error e.backtrace.join("\n")
             end
 
-            trap(:TERM) { OmfEc::Experiment.done }
-            trap(:INT) { OmfEc::Experiment.done }
+            trap(:TERM) { Thread.new {OmfEc::Experiment.done }}
+            trap(:INT) { Thread.new {OmfEc::Experiment.done } }
+            trap(:SIGQUIT) { OmfEc::Experiment.done }
           end
         end
       rescue => e

@@ -114,10 +114,10 @@ module OmfRc::Util::Fibre
     port = res.property.ssh_params.port
     key_file = res.property.ssh_params.key_file
 
-    cmd = "xen list"
+    cmd = "virsh list --all"
 
     vms_list = res.ssh_command(user, ip_address, port, key_file, cmd)
-    vm_info = vms_list.split("\n")[2]
+    vm_info = vms_list.split("\n")[3]
     vm_name = vm_info.split(" ")[0]
     debug "Selected VM = #{vm_name}"
     vm_name

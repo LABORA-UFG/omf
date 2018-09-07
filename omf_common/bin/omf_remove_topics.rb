@@ -5,7 +5,7 @@ TOP_DIR = File.join(BIN_DIR, '..')
 $: << File.join(TOP_DIR, 'lib')
 
 DESCR = %{
-Remove a topic or a set of topics from RabbitMQ Broker.
+Remove a topic/queue or a set of topics/queues from RabbitMQ Broker.
 
 }
 
@@ -37,17 +37,23 @@ opts = {
 base_url = nil
 pattern = nil
 yes_delete = false
+type_to_remove = "topics"
 
 op = OptionParser.new
 op.banner = "Usage: #{op.program_name} [options] topic1 topic2 ...\n#{DESCR}\n"
-op.on '-c', '--comms-url URL', "URL of communication server (e.g. http://user:password@my.server.com)" do |u|
+op.on '-c', '--comms-url URL', "URL of communication server (e.g. http://<address>:15672)" do |u|
   base_url = u.gsub(/\/$/, "")
 end
-op.on '-p', "--pattern PATTERN", "Regular expression with the pattern of the topic(s) names to delete. The script
-              will remove all topics which name follows the regular expression." do |p|
-  pattern = Regexp.new(p)
+
+op.on '-t', '--type_to_remove EXCHANGES|QUEUES|CONNECTIONS', "Type of object to remove (Topics or Queues)" do |t|
+  type_to_remove = t.downcase
 end
-op.on '-y', '--yes-delete', "Delete the topics without asking for user permission" do
+
+op.on '-p', "--pattern PATTERN", "Regular expression with the pattern of the topic(s)/queue(s) names to delete. The script
+              will remove all topics/queues which name follows the regular expression." do |p|
+  pattern = p
+end
+op.on '-y', '--yes-delete', "Delete the topics/queues without asking for user permission" do
   yes_delete = true
 end
 
@@ -60,8 +66,8 @@ unless base_url && pattern
   exit(-1)
 end
 
-def list_topics_with_rest(url)
-  puts "Listing all topics\n"
+def get_request(url)
+  puts "GET #{url}\n"
 
   uri = URI.parse(url)
   http = Net::HTTP.new(address=uri.host, port=uri.port)
@@ -76,12 +82,33 @@ def list_topics_with_rest(url)
   body
 end
 
-def filter_topics_with_pattern(topics, pattern)
-  topics.select { |topic| topic["name"] =~ pattern }
+def put_request(url, res_desc)
+  puts "PUT all topics\n"
+
+  uri = URI.parse(url)
+  http = Net::HTTP.new(address=uri.host, port=uri.port)
+
+  request = Net::HTTP::Put.new(uri.request_uri, initheader = {'Content-Type' =>'application/json'})
+  request.basic_auth 'testbed', 'testbed'
+  request.body = res_desc.to_json
+
+  response = http.request(request)
+
+  body = JSON.parse(response.body)
+  puts body
+  body
 end
 
-def delete_topic_with_rest(url)
-  puts "Delete topic with rest. URL: #{url}\n"
+def filter_topics_with_pattern(topics, pattern)
+  if pattern == "*"
+    topics
+  else
+    topics.select { |topic| topic["name"] =~ /#{pattern}/ }
+  end
+end
+
+def delete_request(url)
+  puts "DELETE #{url}\n"
 
   uri = URI.parse(url)
   http = Net::HTTP.new(uri.host, uri.port)
@@ -94,25 +121,37 @@ def delete_topic_with_rest(url)
   JSON.parse(response.body) if response.body
 end
 
+def ask_and_delete(base_url, type_to_remove, yes_delete, pattern)
+  puts "Removing #{type_to_remove}"
+  url = "#{base_url}/api/#{type_to_remove.downcase}"
+  if type_to_remove.downcase != "connections"
+    url = "#{url}/%2f"
+  end
 
-url = "#{base_url}/api/exchanges/%2f"
+  topics = get_request(url)
+  filtered_topics = filter_topics_with_pattern(topics, pattern)
 
-topics = list_topics_with_rest(url)
-filtered_topics = filter_topics_with_pattern(topics, pattern)
+  unless yes_delete
+    puts "Topics to delete:"
+    puts filtered_topics
+  end
 
-unless yes_delete
-  puts "Topics to delete:"
-  puts filtered_topics
-end
+  require "highline/import"
+  input = ask "Do you really want to delete the topics? (y/N)"
 
-require "highline/import"
-input = ask "Do you really want to delete the topics? (y/N)"
+  if input.downcase == "y"
+    for topic in filtered_topics
+      encoded_name = CGI::escape(topic["name"])
+      url = "#{base_url}/api/#{type_to_remove.downcase}"
+      if type_to_remove.downcase != "connections"
+        url = "#{url}/%2f"
+      end
+      url = "#{url}/#{encoded_name}"
 
-if input.downcase == "y"
-  for topic in filtered_topics
-    encoded_name = CGI::escape(topic["name"])
-    url = "#{base_url}/api/exchanges/%2f/#{encoded_name}"
-    result = delete_topic_with_rest(url)
-    puts result
+      result = delete_request(url)
+      puts result
+    end
   end
 end
+
+ask_and_delete(base_url, type_to_remove, yes_delete, pattern)

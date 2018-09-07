@@ -640,6 +640,7 @@ module OmfRc::ResourceProxy::VirtualMachine
         if state == STATE_DOWN or state == STATE_NOT_CREATED and old_state != STATE_DOWN
           res.set_broker_info({:status => res.property.state})
           res.property.monitoring_vm_state = false
+          res.release_self
         end
         sleep 5
       end

@@ -101,7 +101,7 @@ class OmfRc::ResourceProxy::AbstractResource
   end
 
   attr_accessor :uid, :hrn, :type, :property, :certificate, :state
-  attr_reader :opts, :children, :membership, :creation_opts, :membership_topics, :topics
+  attr_reader :opts, :parent, :children, :membership, :creation_opts, :membership_topics, :topics
 
   # Initialisation
   #
@@ -136,13 +136,13 @@ class OmfRc::ResourceProxy::AbstractResource
       federation_set = true
     end
 
+    @parent = @opts['parent'] if @opts['parent']
     # Heritage federation uid set
     unless federation_set
-      parent = @opts['parent']
-      unless parent.nil?
-        parent_domain = parent.opts.domain
+      unless @parent.nil?
+        parent_domain = @parent.opts.domain
         parent_domain = parent_domain.to_s if parent_domain
-        parent_fed_en = parent.opts.federate
+        parent_fed_en = @parent.opts.federate
         if parent_fed_en === true and !parent_domain.nil? and !@uid.nil?
           @uid = "fed-#{parent_domain}-#{@uid}"
         end

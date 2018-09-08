@@ -65,6 +65,10 @@ module OmfCommon
             @normal_shutdown_mode = true
           end
           info "Disconnecting..."
+          topics = OmfCommon::Comm::Topic.name2inst
+          for name, topic in topics
+            topic.unsubscribe(name)
+          end
 
           @session.close {
             EventMachine.stop { exit }

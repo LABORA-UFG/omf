@@ -14,6 +14,10 @@ module OmfCommon
       @@name2inst = {}
       @@lock = Monitor.new
 
+      def self.name2inst
+        return @@name2inst
+      end
+
       def self.create(name, opts = {}, &block)
         # Force string conversion as 'name' can be an ExperimentProperty
         name = name.to_s.to_sym

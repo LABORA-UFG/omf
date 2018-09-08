@@ -39,6 +39,7 @@ module OmfCommon
 
         def unsubscribe(key)
           super
+          debug "Deleting topic: #{key}"
           @exchange.delete
         end
 

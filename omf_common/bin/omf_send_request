@@ -31,12 +31,51 @@ opts = {
   }
 }
 
+def init_certificates(entity_cert_path, trusted_roots_path)
+  entity_cert = File.expand_path(entity_cert_path)#'~/.omf/user_cert.pem'
+  trusted_roots = File.expand_path(trusted_roots_path) #'~/.omf/trusted_roots'
+  raise FileNotFoundException.new("File #{entity_cert_path} not Found") unless File.exist?(entity_cert)
+  raise FileNotFoundException.new("Folder #{trusted_roots_path} not Found") unless File.exist?(trusted_roots)
+
+  entity = OmfCommon::Auth::Certificate.create_from_pem(File.read(entity_cert))
+  OmfCommon::Auth::CertificateStore.init
+  OmfCommon::Auth::CertificateStore.instance.register_default_certs(trusted_roots)
+
+  entity
+end
+
+@authorization = false
 resource_url = nil
 
 op = OptionParser.new
 op.banner = "Usage: #{op.program_name} [options] [prop1 prop2 ...]\n#{DESCR}\n"
+op.on '-c', '--config FILE', "Configuration file with authorization information" do |file|
+  require 'yaml'
+  if File.exists?(file)
+    @y = YAML.load_file(file)
+  else
+    error "No such file: #{file}"
+    exit
+  end
+
+  if x = @y[:auth]
+    entity_cert_path = x[:entity_cert]
+    trusted_roots_path = x[:trusted_roots]
+  else
+    error "Flowvisor RC details was not found in the configuration file"
+    exit
+  end
+  @entity = init_certificates(entity_cert_path, trusted_roots_path)
+  @authorization = true
+end
+
 op.on '-r', '--resource-url URL', "URL of resource (e.g. xmpp://my.server.com/topic1)" do |url|
   resource_url = url
+end
+
+op.on '-a', '--authorization', "Use default certs (~/.omf/user_cert.pem and ~/.omf/trusted_roots) to authorization" do ||
+  @entity = init_certificates("/root/.omf/user_cert.pem", "/root/.omf/trusted_roots")
+  @authorization = true
 end
 op.on '-d', '--debug', "Set log level to DEBUG" do
   opts[:logging][:level] = 'debug'
@@ -66,6 +105,10 @@ end
 
 OmfCommon.init(OP_MODE, opts) do |el|
   OmfCommon.comm.on_connected do |comm|
+    if @authorization
+      @entity.resource_id = OmfCommon.comm.local_topic.address
+      OmfCommon::Auth::CertificateStore.instance.register(@entity)
+    end
     comm.subscribe(resource) do |topic|
       topic.request(req_properties) do |msg|
         if (src_topic = (msg.src.is_a?(OmfCommon::Comm::Topic) ? msg.src.id : msg.src)) == topic.id

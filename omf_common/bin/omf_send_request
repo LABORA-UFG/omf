@@ -121,7 +121,10 @@ OmfCommon.init(OP_MODE, opts) do |el|
         end
         puts "-----------------"
       end
-      el.after($timeout) { el.stop } if $timeout > 0
+      el.after($timeout) {
+        comm.disconnect()
+        el.stop
+      } if $timeout > 0
     end
   end
 end

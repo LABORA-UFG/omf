@@ -58,9 +58,19 @@ module OmfRc::ResourceProxy::VirtualNode
   end
 
   hook :before_create do |node, type, opts|
+    prefix = ""
+    if opts[:federate]
+      prefix = "fed-#{opts[:domain]}-"
+    end
+
+    if type.to_sym == :application
+      opts[:uid] = "#{prefix}#{@vm_mac}-application-#{opts[:hrn]}"
+    end
+
     if type.to_sym == :net
       net_dev = node.request_devices.find do |v|
         v[:name] == opts[:if_name]
+        opts[:uid] = "#{prefix}#{@vm_mac}-net-#{opts[:if_name]}"
       end
       raise StandardError, "Device '#{opts[:if_name]}' not found" if net_dev.nil?
     end

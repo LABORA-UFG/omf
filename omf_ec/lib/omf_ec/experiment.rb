@@ -441,7 +441,7 @@ module OmfEc
           OmfCommon.el.after(4) do
             info "OMF Experiment Controller #{OmfEc::VERSION} - Exit."
             OmfCommon.el.after(1) do
-              OmfCommon.comm.disconnect
+              OmfCommon.comm.disconnect({:delete => true})
               OmfCommon.eventloop.stop
             end
           end

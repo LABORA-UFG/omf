@@ -144,5 +144,9 @@ module OmfRc::ResourceProxy::Hypervisor
     vm
   end
 
+  work :remove_vm_by_uid do |res, uid|
+    vm = res.property.vm_list.delete_if { |vm_uid| vm_uid.to_s == uid.to_s }
+    vm
+  end
 
 end

@@ -26,7 +26,7 @@ class XMPP
       end
     end
 
-    def unsubscribe(key)
+    def unsubscribe(key, opts={})
       super
       OmfCommon.comm._unsubscribe_one(self.id)
     end

@@ -18,6 +18,10 @@ module OmfCommon
           @address
         end
 
+        def exchange
+          @exchange
+        end
+
         # Call 'block' when topic is subscribed to underlying messaging
         # infrastructure.
         #
@@ -37,10 +41,15 @@ module OmfCommon
           end
         end
 
-        def unsubscribe(key)
+        def unsubscribe(key, opts={})
           super
-          debug "Deleting topic: #{key}"
-          @exchange.delete
+          debug "Unsubscribing from topic: #{key}"
+          if opts[:delete]
+            debug "Deleting topic: #{key}"
+            @exchange.delete
+            channel = @communicator.channel
+            channel.exchanges.delete(key.to_sym)
+          end
         end
 
 
@@ -57,6 +66,8 @@ module OmfCommon
           @on_subscribed_handlers = []
           # Monitor o.op & o.info by default
           @routing_key = opts[:routing_key] || "o.*"
+          @new_topic = opts[:new_topic] || false
+          @parent = opts[:parent] || "orphan"
 
           _init_amqp
         end
@@ -64,7 +75,10 @@ module OmfCommon
         def _init_amqp()
           channel = @communicator.channel
           @exchange = channel.topic(id, :auto_delete => true)
-          channel.queue("", :auto_delete => true) do |queue|
+
+          hostname = (`hostname` || 'unknown').strip
+          queue_name = "#{hostname}-#{Process.pid}_#{@parent}_#{@id}-#{SecureRandom.uuid}"
+          channel.queue(queue_name, :auto_delete => true) do |queue|
             queue.bind(@exchange, routing_key: @routing_key) do ||
               debug "Subscribed to '#@id'"
               # Call all accumulated on_subscribed handlers

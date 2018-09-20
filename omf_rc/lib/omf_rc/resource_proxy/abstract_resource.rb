@@ -164,7 +164,9 @@ class OmfRc::ResourceProxy::AbstractResource
 
     return existing_child if existing_child
 
-    OmfCommon.comm.subscribe(@uid, routing_key: "o.op") do |t|
+    parent_uid = @parent.uid if @parent
+
+    OmfCommon.comm.subscribe(@uid, routing_key: "o.op", parent: parent_uid) do |t|
       @topics << t
 
       if t.error?
@@ -289,7 +291,7 @@ class OmfRc::ResourceProxy::AbstractResource
     call_hook(:after_create, self, new_resource)
 
     self.synchronize do
-      children << new_resource unless existing_child
+      @children << new_resource unless existing_child
     end
     new_resource
   end
@@ -297,11 +299,11 @@ class OmfRc::ResourceProxy::AbstractResource
   # Release a child resource
   #
   # @return [AbstractResource] Released child or nil if error
-  def release(res_id)
-    if (child = children.find { |v| v.uid.to_s == res_id.to_s })
-      if child.release_self()
+  def release(res_id, opts={})
+    if (child = @children.find { |v| v.uid.to_s == res_id.to_s })
+      if child.release_self(opts)
         self.synchronize do
-          children.delete(child)
+          @children.delete(child)
         end
         child
       else
@@ -309,7 +311,7 @@ class OmfRc::ResourceProxy::AbstractResource
       end
       debug "#{child.uid} released"
     else
-      debug "#{res_id} does not belong to #{self.uid}(#{self.hrn}) - #{children.map(&:uid).inspect}"
+      debug "#{res_id} does not belong to #{self.uid}(#{self.hrn}) - #{@children.map(&:uid).inspect}"
     end
     child
   end
@@ -317,17 +319,17 @@ class OmfRc::ResourceProxy::AbstractResource
   # Release this resource. Should ONLY be called by parent resource.
   #
   # @return [Boolean] true if successful
-  def release_self
+  def release_self(opts={})
     # Release children resource recursively
-    children.each do |c|
+    @children.each do |c|
       if c.release_self
         self.synchronize do
-          children.delete(c)
+          @children.delete(c)
         end
       end
     end
 
-    return false unless children.empty?
+    return false unless @children.empty?
 
     info "Releasing hrn: #{hrn}, uid: #{uid}"
 
@@ -341,7 +343,7 @@ class OmfRc::ResourceProxy::AbstractResource
 
     # clean up topics
     @topics.each do |t|
-      t.unsubscribe(@uid)
+      t.unsubscribe(@uid, {:delete => true})
     end
 
     @membership_topics.each_value do |t|
@@ -413,7 +415,7 @@ class OmfRc::ResourceProxy::AbstractResource
   # @return [Hashie::Mash] child resource mash with uid and hrn
   def request_child_resources(*args)
     #children.map { |c| Hashie::Mash.new({ uid: c.uid, name: c.hrn }) }
-    children.map { |c| c.to_hash }
+    @children.map { |c| c.to_hash }
   end
 
   # @!endgroup
@@ -769,7 +771,7 @@ class OmfRc::ResourceProxy::AbstractResource
     if name == uid || membership.any? { |m| m.include?(name) }
       objs = [self]
     else
-      objs = children.find_all { |v| v.uid == name || v.membership.any? { |m| m.include?(name) } }
+      objs = @children.find_all { |v| v.uid == name || v.membership.any? { |m| m.include?(name) } }
     end
     objs
   end
@@ -849,7 +851,7 @@ class OmfRc::ResourceProxy::AbstractResource
   end
 
   def find_children_by_uid(uid)
-    child = children.find { |v| v.uid.to_s == uid.to_s }
+    child = @children.find { |v| v.uid.to_s == uid.to_s }
     child
   end
 

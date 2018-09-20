@@ -29,7 +29,7 @@ module OmfCommon
           # # ignore arguments
         # end
 
-        attr_reader :channel
+        attr_reader :channel, :topics
 
         # Initialize comms layer
         #
@@ -67,7 +67,7 @@ module OmfCommon
           info "Disconnecting..."
           topics = OmfCommon::Comm::Topic.name2inst
           for name, topic in topics
-            topic.unsubscribe(name)
+            topic.unsubscribe(name, opts)
           end
 
           @session.close {

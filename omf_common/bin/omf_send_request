@@ -122,7 +122,8 @@ OmfCommon.init(OP_MODE, opts) do |el|
         puts "-----------------"
       end
       el.after($timeout) {
-        comm.disconnect()
+        disconect_opts = {:delete => true}
+        comm.disconnect(disconect_opts)
         el.stop
       } if $timeout > 0
     end

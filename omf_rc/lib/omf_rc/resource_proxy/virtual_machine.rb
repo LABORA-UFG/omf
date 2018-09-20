@@ -250,10 +250,12 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :vm_opts, :default => {}
   property :federate, :default => false
   property :domain, :default => ''
+  property :mac_address, :default => ''
   property :image_path
   property :imOk, :default => false
   property :force_new, :default => false
   property :monitoring_vm_state, :default => false
+  @threads = []
 
   hook :before_ready do |resource|
     parent = resource.opts.parent
@@ -293,7 +295,7 @@ module OmfRc::ResourceProxy::VirtualMachine
     end
 
     # Send inform message to tell EC that the VM RC are ok and he can send the configure messages
-    Thread.new {
+    thread = Thread.new {
       debug "Starting VM_IMOK inform send to OMF_EC until a configure message is not received..."
       until resource.property.imOk
         debug "Sending VM_IMOK message..."
@@ -302,6 +304,11 @@ module OmfRc::ResourceProxy::VirtualMachine
       end
       debug "Configure received, stopping VM_IMOK messages sending..."
     }
+    @threads << thread
+  end
+
+  hook :before_release do |resource|
+    debug "RELEASING RESOURCE: #{resource.uid}"
   end
 
   request :state do |res|
@@ -376,10 +383,11 @@ module OmfRc::ResourceProxy::VirtualMachine
   #
   configure :action do |res, value|
     act = value.to_s.downcase
-    Thread.new {
+    thread = Thread.new {
       res.send("#{act}_vm")
     }
     res.property.action = value
+    @threads << thread
   end
 
   work :build_vm do |res|
@@ -396,7 +404,7 @@ module OmfRc::ResourceProxy::VirtualMachine
     end
 
     if vm_state == STATE_NOT_CREATED
-      res.set_broker_info({:status => BROKER_STATUS_CREATING})
+      set_broker_info(res, {:status => BROKER_STATUS_CREATING})
       res.property.state = BROKER_STATUS_CREATING
       res.send("build_img_with_#{res.property.img_builder}")
     elsif vm_state == STATE_RUNNING
@@ -421,7 +429,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       mac_address = res.get_mac_addr(res.property.vm_name)
       broker_info[:mac_address] = mac_address
     end
-    res.set_broker_info(broker_info) unless vm_is_running
+    set_broker_info(res, broker_info) unless vm_is_running
     # ---- end broker integration ----
 
     if is_created
@@ -490,14 +498,14 @@ module OmfRc::ResourceProxy::VirtualMachine
     vm_state = res.check_vm_state(res)
 
     if vm_state == STATE_RUNNING
-      res.set_broker_info({:status => BROKER_STATUS_SHOOTING_DOWN})
+      set_broker_info(res, {:status => BROKER_STATUS_SHOOTING_DOWN})
       res.property.state = BROKER_STATUS_SHOOTING_DOWN
       res.send("stop_vm_with_#{res.property.virt_mngt}")
     else
       res.log_inform_warn "Cannot stop VM: it is not running "+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
     end
-    res.set_broker_info({:status => BROKER_STATUS_DOWN})
+    set_broker_info(res, {:status => BROKER_STATUS_DOWN})
     res.property.state = BROKER_STATUS_DOWN
   end
 
@@ -505,7 +513,7 @@ module OmfRc::ResourceProxy::VirtualMachine
     vm_state = res.check_vm_state(res)
 
     if vm_state == STATE_DOWN
-      res.set_broker_info({:status => BROKER_STATUS_BOOTING})
+      set_broker_info(res, {:status => BROKER_STATUS_BOOTING})
       res.property.state = STATE_RUNNING
       res.send("run_vm_with_#{res.property.virt_mngt}")
 
@@ -567,16 +575,17 @@ module OmfRc::ResourceProxy::VirtualMachine
   end
 
   configure :update_status do |res, opts|
-    res.set_broker_info({:status => res.property.state})
+    set_broker_info(res, {:status => res.property.state})
   end
 
-  work :set_broker_info do |resource, broker_info|
+  def self.set_broker_info(resource, broker_info, &block)
     unless resource.property.broker_vm_topic.nil?
       debug "Sending broker VM info: '#{broker_info}'"
       resource.property.broker_vm_topic.configure(broker_info) do |msg|
         if msg.error?
           resource.log_inform_error("Could not set broker info: #{msg}")
         end
+        block.call(resource.property.broker_vm_topic) if block
       end
     end
   end
@@ -596,7 +605,7 @@ module OmfRc::ResourceProxy::VirtualMachine
 
   work :start_booting_monitor do |resource, vm_topic|
     if resource.property.started
-      Thread.new {
+      thread = Thread.new {
         debug "Starting booting monitoring to VM '#{vm_topic}'. Timeout set to #{resource.property.boot_timeout} " +
                   "seconds."
 
@@ -613,6 +622,7 @@ module OmfRc::ResourceProxy::VirtualMachine
               if msg.itype == 'BOOT.INITIALIZED' || msg.itype == 'BOOT.DONE'
                 started = true
               end
+
             end
           end
         end
@@ -627,29 +637,48 @@ module OmfRc::ResourceProxy::VirtualMachine
           end
         end
       }
+      @threads << thread
     end
   end
 
   work :update_vm_state do |res|
     res.property.monitoring_vm_state = true
-    Thread.new {
+    thread = Thread.new {
       while(res.property.monitoring_vm_state) do
         debug "update_vm_state: Updating VM state. Thread id: #{Thread.current.object_id}"
         old_state = res.property.state
         state = res.check_vm_state(res)
-        if state == STATE_DOWN or state == STATE_NOT_CREATED and old_state != STATE_DOWN
-          res.set_broker_info({:status => res.property.state})
-          res.property.monitoring_vm_state = false
-          res.release_self
+        if state == STATE_DOWN or state == STATE_NOT_CREATED and (old_state != STATE_DOWN and old_state != STATE_NOT_CREATED)
+          set_broker_info(res, {:status => res.property.state}) do |vm_topic|
+            res.property.broker_topic.release(vm_topic, {:delete => true}) do |msg|
+
+              res.release(res.property.vm_topic)
+              res.property.monitoring_vm_state = false
+              res.parent.remove_vm_by_uid(res.uid)
+              res.parent.release(res.uid, {:delete => true})
+
+              topics = OmfCommon::Comm::Topic.name2inst
+              for name, topic in topics
+                mac_regex = Regexp.new(Regexp.quote(res.property.mac_address))
+                am_controller_topic_regex = Regexp.new(Regexp.quote(vm_topic.id))
+                if name =~ mac_regex or name =~ am_controller_topic_regex
+                  topic.unsubscribe(name, {:delete => true})
+                  OmfCommon::Comm::Topic.name2inst.delete(name)
+                end
+              end
+              @threads.each {|thr| thr.exit}
+            end
+          end
         end
         sleep 5
       end
     }
+    @threads << thread
   end
 
   work :get_vm_node_topic do |res|
-    vm_topic = res.get_mac_addr(res.property.vm_name)
-    vm_topic
+    res.property.mac_address = res.get_mac_addr(res.property.vm_name)
+    vm_topic = res.property.mac_address
     if res.property.federate
       vm_topic = "fed-#{res.property.domain}-#{vm_topic}"
     end

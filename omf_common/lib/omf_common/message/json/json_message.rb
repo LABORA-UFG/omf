@@ -45,7 +45,7 @@ module OmfCommon
             props: properties
           })
           issuer = self.authenticate? ? (body[:issuer] || body[:src]) : nil
-          self.new(content, issuer)
+          self.new(content, issuer) # new message
         end
 
         def self.create_inform_message(itype = nil, properties = {}, body = {})
@@ -184,7 +184,7 @@ module OmfCommon
 
 
         def to_s
-          "JsonMessage: #{@content.inspect}"
+          "JsonMessage: #{@content.to_yaml}"
         end
 
         # We just want to know the content of an non-repeatable element
@@ -259,7 +259,7 @@ module OmfCommon
 
         private
         def initialize(content, issuer = nil)
-          debug "Create message: #{content.inspect}"
+          debug "Create message: #{content.to_yaml}"
           unless op = content[:op]
             raise "Missing message type (:operation)"
           end

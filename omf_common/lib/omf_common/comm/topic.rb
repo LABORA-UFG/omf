@@ -123,7 +123,7 @@ module OmfCommon
       # Remove all registered callbacks for 'key'. Will also unsubscribe from the underlying
       # comms layer if no callbacks remain.
       #
-      def unsubscribe(key)
+      def unsubscribe(key, opts={})
         @lock.synchronize do
           @handlers.clear
           @@name2inst.delete_if { |k, v| k == id.to_sym || k == address.to_sym}

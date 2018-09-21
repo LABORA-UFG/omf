@@ -99,15 +99,7 @@ module OmfRc::ResourceProxy::Hypervisor
     existing_vm = res.find_vm_by_uid(child_res.uid)
     if existing_vm
       child_res.property.imOk = false
-      Thread.new {
-        debug "Starting VM_IMOK inform send to OMF_EC until a configure message is not received..."
-        until child_res.property.imOk
-          debug "Sending VM_IMOK message..."
-          sleep 1
-          child_res.inform(:VM_IMOK, {:info => "I am Ok"})
-        end
-        debug "Configure received, stopping VM_IMOK messages sending..."
-      }
+      child_res.send_vm_im_ok
     else
       logger.info "Created new child VM: #{child_res.uid}"
       res.property.vm_list << child_res.uid

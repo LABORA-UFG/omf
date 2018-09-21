@@ -295,6 +295,11 @@ module OmfRc::ResourceProxy::VirtualMachine
     end
 
     # Send inform message to tell EC that the VM RC are ok and he can send the configure messages
+    thread = resource.send_vm_im_ok
+    @threads << thread
+  end
+
+  work :send_vm_im_ok do |resource|
     thread = Thread.new {
       debug "Starting VM_IMOK inform send to OMF_EC until a configure message is not received..."
       until resource.property.imOk
@@ -304,7 +309,10 @@ module OmfRc::ResourceProxy::VirtualMachine
       end
       debug "Configure received, stopping VM_IMOK messages sending..."
     }
-    @threads << thread
+    OmfCommon.el.after(15) do ||
+      thread.exit
+    end
+    thread
   end
 
   hook :before_release do |resource|

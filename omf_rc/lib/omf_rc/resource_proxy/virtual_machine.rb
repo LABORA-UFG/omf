@@ -311,12 +311,37 @@ module OmfRc::ResourceProxy::VirtualMachine
     }
     OmfCommon.el.after(15) do ||
       thread.exit
+      resource.release unless resource.property.imOk
     end
     thread
   end
 
-  hook :before_release do |resource|
-    debug "RELEASING RESOURCE: #{resource.uid}"
+  hook :before_release do |res|
+    debug "RELEASING RESOURCE: #{res.uid}"
+    res.release
+  end
+
+  work :release do |res|
+    res.property.monitoring_vm_state = false
+    set_broker_info(res, {:status => res.property.state}) do |vm_topic|
+      res.property.broker_topic.release(vm_topic, {:delete => true}) do |msg|
+
+        res.release(res.property.vm_topic)
+        res.parent.remove_vm_by_uid(res.uid)
+        res.parent.release(res.uid, {:delete => true})
+
+        topics = OmfCommon::Comm::Topic.name2inst
+        for name, topic in topics
+          mac_regex = Regexp.new(Regexp.quote(res.property.mac_address))
+          am_controller_topic_regex = Regexp.new(Regexp.quote(vm_topic.id))
+          if name =~ mac_regex or name =~ am_controller_topic_regex
+            topic.unsubscribe(name, {:delete => true})
+            OmfCommon::Comm::Topic.name2inst.delete(name)
+          end
+        end
+        @threads.each {|thr| thr.exit}
+      end
+    end
   end
 
   request :state do |res|
@@ -528,7 +553,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       # Start boot monitoring
       res.property.vm_topic = res.get_vm_node_topic
       res.start_booting_monitor(res.property.vm_topic)
-      res.update_vm_state(res)
+      res.update_vm_state(res) unless res.property.monitoring_vm_state
     else
       res.log_inform_warn "Cannot run VM: it is not stopped or ready yet "+
         "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
@@ -657,26 +682,7 @@ module OmfRc::ResourceProxy::VirtualMachine
         old_state = res.property.state
         state = res.check_vm_state(res)
         if state == STATE_DOWN or state == STATE_NOT_CREATED and (old_state != STATE_DOWN and old_state != STATE_NOT_CREATED)
-          set_broker_info(res, {:status => res.property.state}) do |vm_topic|
-            res.property.broker_topic.release(vm_topic, {:delete => true}) do |msg|
-
-              res.release(res.property.vm_topic)
-              res.property.monitoring_vm_state = false
-              res.parent.remove_vm_by_uid(res.uid)
-              res.parent.release(res.uid, {:delete => true})
-
-              topics = OmfCommon::Comm::Topic.name2inst
-              for name, topic in topics
-                mac_regex = Regexp.new(Regexp.quote(res.property.mac_address))
-                am_controller_topic_regex = Regexp.new(Regexp.quote(vm_topic.id))
-                if name =~ mac_regex or name =~ am_controller_topic_regex
-                  topic.unsubscribe(name, {:delete => true})
-                  OmfCommon::Comm::Topic.name2inst.delete(name)
-                end
-              end
-              @threads.each {|thr| thr.exit}
-            end
-          end
+          res.release
         end
         sleep 5
       end

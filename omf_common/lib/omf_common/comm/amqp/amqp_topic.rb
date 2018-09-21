@@ -94,6 +94,7 @@ module OmfCommon
             queue.subscribe do |headers, payload|
               debug "Received message on #{@address} | #{@routing_key}"
               MPReceived.inject(Time.now.to_f, @address, payload.to_s[/mid\":\"(.{36})/, 1]) if OmfCommon::Measure.enabled?
+              # TODO change parse to include the @address as the parent of the topic
               Message.parse(payload, headers.content_type) do |msg|
                 on_incoming_message(msg)
               end

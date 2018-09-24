@@ -100,6 +100,7 @@ module OmfEc::Vm
         r_type = 'application'
         resource_group_name = self.address(r_type)
         opts = opts.merge({
+                              name: name,
                               hrn: name,
                               membership: resource_group_name,
                               state: 'created'
@@ -213,5 +214,16 @@ module OmfEc::Vm
         }
       end
     end
+
+    def releaseVMs
+      if @vms.empty?
+        warn "No VMs created in group #{@name}. Nothing to release"
+      else
+        @vms.each { |vm|
+          @topic.release(vm.vm_topic, { assert: OmfEc.experiment.assertion }) if vm.vm_topic
+        }
+      end
+    end
+
   end
 end

@@ -255,7 +255,8 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :imOk, :default => false
   property :force_new, :default => false
   property :monitoring_vm_state, :default => false
-  @threads = []
+  property :release_actions_executed, :default => false
+  property :threads, :default => []
 
   hook :before_ready do |resource|
     parent = resource.opts.parent
@@ -296,7 +297,7 @@ module OmfRc::ResourceProxy::VirtualMachine
 
     # Send inform message to tell EC that the VM RC are ok and he can send the configure messages
     thread = resource.send_vm_im_ok
-    @threads << thread
+    resource.property.threads << thread
   end
 
   work :send_vm_im_ok do |resource|
@@ -311,24 +312,25 @@ module OmfRc::ResourceProxy::VirtualMachine
     }
     OmfCommon.el.after(15) do ||
       thread.exit
-      resource.release unless resource.property.imOk
+      resource.release_actions unless resource.property.imOk
     end
     thread
   end
 
   hook :before_release do |res|
     debug "RELEASING RESOURCE: #{res.uid}"
-    res.release
+    res.release_actions(from_before_release=true) unless res.property.release_actions_executed
   end
 
-  work :release do |res|
+  work :release_actions do |res, from_before_release|
     res.property.monitoring_vm_state = false
+    res.property.release_actions_executed = true
     set_broker_info(res, {:status => res.property.state}) do |vm_topic|
       res.property.broker_topic.release(vm_topic, {:delete => true}) do |msg|
 
         res.release(res.property.vm_topic)
         res.parent.remove_vm_by_uid(res.uid)
-        res.parent.release(res.uid, {:delete => true})
+        res.parent.release(res.uid, {:delete => true}) unless from_before_release
 
         topics = OmfCommon::Comm::Topic.name2inst
         for name, topic in topics
@@ -339,7 +341,7 @@ module OmfRc::ResourceProxy::VirtualMachine
             OmfCommon::Comm::Topic.name2inst.delete(name)
           end
         end
-        @threads.each {|thr| thr.exit}
+        res.property.threads.each {|thr| thr.exit}
       end
     end
   end
@@ -420,7 +422,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       res.send("#{act}_vm")
     }
     res.property.action = value
-    @threads << thread
+    res.property.threads << thread
   end
 
   work :build_vm do |res|
@@ -670,7 +672,7 @@ module OmfRc::ResourceProxy::VirtualMachine
           end
         end
       }
-      @threads << thread
+      resource.property.threads << thread
     end
   end
 
@@ -682,12 +684,12 @@ module OmfRc::ResourceProxy::VirtualMachine
         old_state = res.property.state
         state = res.check_vm_state(res)
         if state == STATE_DOWN or state == STATE_NOT_CREATED and (old_state != STATE_DOWN and old_state != STATE_NOT_CREATED)
-          res.release
+          res.release_actions
         end
         sleep 5
       end
     }
-    @threads << thread
+    res.property.threads << thread
   end
 
   work :get_vm_node_topic do |res|

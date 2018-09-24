@@ -402,7 +402,7 @@ module OmfEc
     # Purely for backward compatibility
     class << self
       # Disconnect communicator, try to delete any XMPP affiliations
-      def done
+      def done(done_vms=false)
         info "Experiment: #{OmfEc.experiment.id} finished"
         info "Exit in 15 seconds..."
 
@@ -431,12 +431,15 @@ module OmfEc
             end
           end
 
-          # allVmGroups do |vmg|
-          #   unless vmg.app_contexts.empty?
-          #     info "Release vm group '#{vmg.name}' applications"
-          #     vmg.releaseApplications
-          #   end
-          # end
+          if done_vms
+            allVmGroups do |vmg|
+              unless vmg.app_contexts.empty?
+                info "Release vm group '#{vmg.name}' applications"
+                vmg.releaseApplications
+                vmg.releaseVMs
+              end
+            end
+          end
 
           OmfCommon.el.after(4) do
             info "OMF Experiment Controller #{OmfEc::VERSION} - Exit."

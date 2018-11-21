@@ -41,14 +41,29 @@ module OmfCommon
           end
         end
 
-        def unsubscribe(key, opts={})
+        def unsubscribe(key, opts={}, &block)
           super
           debug "Unsubscribing from topic: #{key}"
           if opts[:delete]
-            debug "Deleting topic: #{key}"
-            @exchange.delete
-            channel = @communicator.channel
-            channel.exchanges.delete(key.to_sym)
+            debug "Deleting topic: #{key}, @children = #{@children}, @subtopics = #{@subtopics}"
+            @subtopics.each {|subtopic| @@name2inst[subtopic].unsubscribe(subtopic, opts)}
+            if @children and opts[:release_childs]
+              @children.each_with_index do |child, index|
+                if index == @children.size - 1
+                  self.release(@@name2inst[child], {:delete => true}) do |msg|
+                    @exchange.delete
+                    channel = @communicator.channel
+                    channel.exchanges.delete(key.to_sym)
+                  end
+                else
+                  self.release(@@name2inst[child], {:delete => true})
+                end
+              end
+            else
+              @exchange.delete
+              channel = @communicator.channel
+              channel.exchanges.delete(key.to_sym)
+            end
           end
         end
 
@@ -95,7 +110,7 @@ module OmfCommon
               debug "Received message on #{@address} | #{@routing_key}"
               MPReceived.inject(Time.now.to_f, @address, payload.to_s[/mid\":\"(.{36})/, 1]) if OmfCommon::Measure.enabled?
               # TODO change parse to include the @address as the parent of the topic
-              Message.parse(payload, headers.content_type) do |msg|
+              Message.parse(payload, headers.content_type, parent_address=@parent) do |msg|
                 on_incoming_message(msg)
               end
             end

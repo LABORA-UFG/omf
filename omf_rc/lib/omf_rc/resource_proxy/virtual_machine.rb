@@ -219,10 +219,10 @@ module OmfRc::ResourceProxy::VirtualMachine
   VM_OS_DEFAULT = 'ubuntu'
   # Default OMF v6 parameters for the Resource Controller on the VM
   OMF_DEFAULT = Hashie::Mash.new({
-                server: 'srv.mytestbed.net',
-                user: nil, password: nil,
-                topic: nil
-                })
+                                     server: 'srv.mytestbed.net',
+                                     user: nil, password: nil,
+                                     topic: nil
+                                 })
 
   # VM States
   STATE_NOT_CREATED = 'NOT_CREATED'
@@ -255,8 +255,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :imOk, :default => false
   property :force_new, :default => false
   property :monitoring_vm_state, :default => false
-  property :release_actions_executed, :default => false
-  property :threads, :default => []
+  @threads = []
 
   hook :before_ready do |resource|
     parent = resource.opts.parent
@@ -273,7 +272,7 @@ module OmfRc::ResourceProxy::VirtualMachine
     # broker config...
     debug "Subscribing to broker topic: #{resource.property.broker_topic_name}"
     resource.inform(:info, Hashie::Mash.new({:info => "Getting VM resource in broker, this can take a while..."}))
-    OmfCommon.comm.subscribe(resource.property.broker_topic_name) do |topic|
+    OmfCommon.comm.subscribe(resource.property.broker_topic_name, :parent_address => resource.uid) do |topic|
       if topic.error?
         error = "Could not subscribe to broker topic"
         resource.log_inform_error(error)
@@ -281,7 +280,7 @@ module OmfRc::ResourceProxy::VirtualMachine
         resource.property.broker_topic = topic
 
         debug "Checking if virtual machine '#{resource.property.label}' is available"
-        resource.property.broker_topic.create(:virtual_machine, {:label => resource.property.label}) do |msg|
+        resource.property.broker_topic.create(:vm_inventory, {:label => resource.property.label}) do |msg|
           if msg.error?
             error = "The virtual machine '#{resource.property.label}' is not available"
             resource.log_inform_error(error)
@@ -297,7 +296,7 @@ module OmfRc::ResourceProxy::VirtualMachine
 
     # Send inform message to tell EC that the VM RC are ok and he can send the configure messages
     thread = resource.send_vm_im_ok
-    resource.property.threads << thread
+    @threads << thread
   end
 
   work :send_vm_im_ok do |resource|
@@ -319,14 +318,17 @@ module OmfRc::ResourceProxy::VirtualMachine
 
   hook :before_release do |res|
     debug "RELEASING RESOURCE: #{res.uid}"
-    res.release_actions(from_before_release=true) unless res.property.release_actions_executed
+    unless res.property.released
+      res.stop_vm
+      res.release_actions(from_before_release=true)
+    end
   end
 
   work :release_actions do |res, from_before_release|
     res.property.monitoring_vm_state = false
-    res.property.release_actions_executed = true
+    res.property.released = true
     set_broker_info(res, {:status => res.property.state}) do |vm_topic|
-      res.property.broker_topic.release(vm_topic, {:delete => true}) do |msg|
+      res.property.broker_topic.release(vm_topic, {:delete => true}) do |msg| # am_controller.release(am_controller_urn:...)
 
         res.release(res.property.vm_topic)
         res.parent.remove_vm_by_uid(res.uid)
@@ -341,7 +343,7 @@ module OmfRc::ResourceProxy::VirtualMachine
             OmfCommon::Comm::Topic.name2inst.delete(name)
           end
         end
-        res.property.threads.each {|thr| thr.exit}
+        @threads.each {|thr| thr.exit}
       end
     end
   end
@@ -388,7 +390,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       end
     else
       res.log_inform_error "OMF option configuration failed! "+
-        "Options not passed as Hash (#{opts.inspect})"
+                               "Options not passed as Hash (#{opts.inspect})"
     end
     res.property.omf_opts
   end
@@ -422,12 +424,12 @@ module OmfRc::ResourceProxy::VirtualMachine
       res.send("#{act}_vm")
     }
     res.property.action = value
-    res.property.threads << thread
+    @threads << thread
   end
 
   work :build_vm do |res|
     res.log_inform_warn "Trying to build an already built VM, make sure to "+
-      "have the 'overwrite' property set to true!" if res.property.ready
+                            "have the 'overwrite' property set to true!" if res.property.ready
 
     vm_state = res.check_vm_state(res)
     vm_is_running = false
@@ -451,7 +453,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       vm_is_running = true
     end
 
-    res.property.vm_topic = res.get_vm_node_topic
+    res.property.vm_topic = res.get_vm_node_topic # topic with mac address
 
     # ----Setting up broker vm info ----
     is_created = !(res.property.vm_topic.include? "error:")
@@ -478,9 +480,9 @@ module OmfRc::ResourceProxy::VirtualMachine
 
   work :define_vm do |res|
     unless File.exist?(res.property.vm_definition)
-        res.log_inform_error "Cannot define VM (name: "+
-          "'#{res.property.vm_name}'): definition path not set "+
-          "or file does not exist (path: '#{res.property.vm_definition}')"
+      res.log_inform_error "Cannot define VM (name: "+
+                               "'#{res.property.vm_name}'): definition path not set "+
+                               "or file does not exist (path: '#{res.property.vm_definition}')"
     else
       vm_state = res.check_vm_state(res)
 
@@ -489,15 +491,15 @@ module OmfRc::ResourceProxy::VirtualMachine
         res.inform(:status, Hashie::Mash.new({:status => {:ready => res.property.ready}}))
       else
         res.log_inform_warn "Cannot define VM: it is not stopped"+
-        "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
+                                "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
       end
     end
   end
 
   work :attach_vm do |res|
     unless !res.property.vm_name.nil? || !res.property.vm_name == ""
-        res.log_inform_error "Cannot attach VM, name not set"+
-          "(name: '#{res.property.vm_name})'"
+      res.log_inform_error "Cannot attach VM, name not set"+
+                               "(name: '#{res.property.vm_name})'"
     else
       vm_state = res.check_vm_state(res)
 
@@ -506,16 +508,16 @@ module OmfRc::ResourceProxy::VirtualMachine
         res.inform(:status, Hashie::Mash.new({:status => {:ready => res.property.ready}}))
       else
         res.log_inform_warn "Cannot attach VM: it is not stopped"+
-        "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
+                                "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
       end
     end
   end
 
   work :clone_from_vm do |res|
     unless !res.property.vm_name.nil? || !res.property.vm_name == "" ||
-      !res.image_directory.nil? || !res.image_directory == ""
+        !res.image_directory.nil? || !res.image_directory == ""
       res.log_inform_error "Cannot clone VM: name or directory not set "+
-        "(name: '#{res.property.vm_name}' - dir: '#{res.property.image_directory}')"
+                               "(name: '#{res.property.vm_name}' - dir: '#{res.property.image_directory}')"
     else
       vm_state = res.check_vm_state(res)
 
@@ -524,7 +526,7 @@ module OmfRc::ResourceProxy::VirtualMachine
         res.inform(:status, Hashie::Mash.new({:status => {:ready => res.property.ready}}))
       else
         res.log_inform_warn "Cannot clone VM: it is not stopped"+
-        "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
+                                "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
       end
     end
   end
@@ -537,9 +539,11 @@ module OmfRc::ResourceProxy::VirtualMachine
       res.property.state = BROKER_STATUS_SHOOTING_DOWN
       res.send("stop_vm_with_#{res.property.virt_mngt}")
     else
+      res.inform(:status, Hashie::Mash.new({:vm_return => "VM stopped successfully"}))
       res.log_inform_warn "Cannot stop VM: it is not running "+
-        "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
+                              "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
     end
+    res.property.monitoring_vm_state = false
     set_broker_info(res, {:status => BROKER_STATUS_DOWN})
     res.property.state = BROKER_STATUS_DOWN
   end
@@ -553,12 +557,12 @@ module OmfRc::ResourceProxy::VirtualMachine
       res.send("run_vm_with_#{res.property.virt_mngt}")
 
       # Start boot monitoring
-      res.property.vm_topic = res.get_vm_node_topic
+      res.property.vm_topic = res.get_vm_node_topic # topic with mac address
       res.start_booting_monitor(res.property.vm_topic)
       res.update_vm_state(res) unless res.property.monitoring_vm_state
     else
       res.log_inform_warn "Cannot run VM: it is not stopped or ready yet "+
-        "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
+                              "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
     end
   end
 
@@ -569,8 +573,8 @@ module OmfRc::ResourceProxy::VirtualMachine
       res.send("delete_vm_with_#{res.property.virt_mngt}", res.property.vm_name, res.property.image_path)
     else
       res.log_inform_warn "Cannot delete VM: it is not stopped or ready yet "+
-        "(name: '#{res.property.vm_name}' - state: #{res.property.state} "+
-        "- ready: #{res.property.ready}"
+                              "(name: '#{res.property.vm_name}' - state: #{res.property.state} "+
+                              "- ready: #{res.property.ready}"
     end
   end
 
@@ -645,7 +649,7 @@ module OmfRc::ResourceProxy::VirtualMachine
                   "seconds."
 
         started = false
-        OmfCommon.comm.subscribe(vm_topic) do |topic|
+        OmfCommon.comm.subscribe(vm_topic, :parent_address => resource.uid) do |topic|
           if topic.error?
             error = "Could not subscribe to broker topic"
             resource.log_inform_error(error)
@@ -672,7 +676,7 @@ module OmfRc::ResourceProxy::VirtualMachine
           end
         end
       }
-      resource.property.threads << thread
+      @threads << thread
     end
   end
 
@@ -689,7 +693,7 @@ module OmfRc::ResourceProxy::VirtualMachine
         sleep 5
       end
     }
-    res.property.threads << thread
+    @threads << thread
   end
 
   work :get_vm_node_topic do |res|

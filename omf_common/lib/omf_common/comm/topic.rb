@@ -6,6 +6,7 @@
 require 'monitor'
 require 'securerandom'
 require 'openssl'
+require 'sourcify'
 
 module OmfCommon
   class Comm
@@ -13,6 +14,8 @@ module OmfCommon
 
       @@name2inst = {}
       @@lock = Monitor.new
+      @children = []
+      @subtopics = []
 
       def self.name2inst
         return @@name2inst
@@ -38,13 +41,14 @@ module OmfCommon
         @@name2inst[name]
       end
 
-      attr_reader :id, :routing_key
+      attr_reader :id, :routing_key, :children
 
       # Request the creation of a new resource. Returns itself
       #
       def create(res_type, config_props = {}, core_props = {}, &block)
         config_props[:type] ||= res_type
-        debug "Create resource of type '#{res_type}'"
+        config_props[:parent] ||= id
+        debug "Create resource of type '#{res_type}', '#{self.address}'"
         create_message_and_publish(:create, config_props, core_props, block)
         self
       end
@@ -99,10 +103,10 @@ module OmfCommon
       #
       # and we shall add :message for ALL types of messages.
       [:created,
-        :create_succeeded, :create_failed,
-        :inform_status, :inform_failed,
-        :released, :failed,
-        :creation_ok, :creation_failed, :status, :error, :warn
+       :create_succeeded, :create_failed,
+       :inform_status, :inform_failed,
+       :released, :failed,
+       :creation_ok, :creation_failed, :status, :error, :warn
       ].each do |itype|
         mname = "on_#{itype}"
         define_method(mname) do |*args, &message_block|
@@ -150,14 +154,38 @@ module OmfCommon
         end
       end
 
+      def add_child(child_id)
+        @children << child_id
+      end
+
+      def add_subtopic(topic_id)
+        @subtopics << topic_id
+      end
+
       private
 
       def initialize(id, opts = {})
         @id = id
+        debug "OPTS IN INITIALIZE TOPIC = #{opts.to_yaml}"
+        if opts[:parent]
+          parent = opts[:parent].to_sym
+          if @@name2inst[parent]
+            @@name2inst[parent].add_child(id)
+          end
+        end
+        if opts[:parent_address]
+          parent_address = opts[:parent_address] || "orphan"
+          parent_address = parent_address.to_sym
+          if @@name2inst[parent_address]
+            @@name2inst[parent_address].add_subtopic(id)
+          end
+        end
         #@address = opts[:address]
         @handlers = {}
         @lock = Monitor.new
         @context2cbk = {}
+        @children = []
+        @subtopics = []
       end
 
       # _send_message will also register callbacks for reply messages by default
@@ -186,10 +214,10 @@ module OmfCommon
           # TODO keep converting itype is painful, need to solve this.
           if (it = msg.itype(:ruby)) # format itype as lower case string
             case it
-            when "creation_ok"
-              htypes << :create_succeeded
-            when 'status'
-              htypes << :inform_status
+              when "creation_ok"
+                htypes << :create_succeeded
+              when 'status'
+                htypes << :inform_status
             end
 
             htypes << it.to_sym

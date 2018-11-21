@@ -343,7 +343,7 @@ class OmfRc::ResourceProxy::AbstractResource
 
     # clean up topics
     @topics.each do |t|
-      t.unsubscribe(@uid, {:delete => true})
+      t.unsubscribe(@uid, {:delete => true, :release_childs => true})
     end
 
     @membership_topics.each_value do |t|

@@ -1,11 +1,21 @@
 ---
 # default topic name is this machine's hostname
 # this is to ensure that every RC has its own topic and AMQP account
-environment: production
+#environment: development
+environment: development
+debug: true
 
 communication:
-  url: amqp://localhost
+  url: amqp://10.136.11.112
+  user: testbed
+  password: testbed
+
+credentials:
+  root_cert_dir: /root/.omf/trusted_roots
+  entity_cert: /root/.omf/am.pem
+  entity_key: /root/.omf/am.pkey
 
 resources:
 - type: node
   uid: <%= Socket.gethostname %>
+

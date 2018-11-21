@@ -21,14 +21,14 @@ module OmfCommon
     OMF_CORE_WRITE = [:replyto, :itype, :guard, :assert]
 
     @@providers = {
-      xml: {
-        require: 'omf_common/message/xml/message',
-        constructor: 'OmfCommon::Message::XML::Message'
-      },
-      json: {
-        require: 'omf_common/message/json/json_message',
-        constructor: 'OmfCommon::Message::Json::Message'
-      }
+        xml: {
+            require: 'omf_common/message/xml/message',
+            constructor: 'OmfCommon::Message::XML::Message'
+        },
+        json: {
+            require: 'omf_common/message/json/json_message',
+            constructor: 'OmfCommon::Message::Json::Message'
+        }
     }
     @@message_class = nil
     @@authenticate_messages = false
@@ -53,9 +53,9 @@ module OmfCommon
     # If authentication is on, the message will only be handed
     # to 'block' if the source of the message can be authorized.
     #
-    def self.parse(str, content_type = nil, &block)
+    def self.parse(str, content_type = nil, parent_address=nil, &block)
       raise ArgumentError, 'Need message handling block' unless block
-      @@message_class.parse(str, content_type) do |msg|
+      @@message_class.parse(str, content_type, parent_address) do |msg|
         if @@authorisation_hook
           # Hook will return message if it's authorized. Handing in
           # dispatch block in case hook needs more time for authorization.
@@ -165,7 +165,9 @@ module OmfCommon
 
     def resource
       name = _get_property(:res_id)
-      OmfCommon.comm.create_topic(name)
+      parent = _get_property(:parent)
+      opts = {:parent => parent[:uid].to_sym}
+      OmfCommon.comm.create_topic(name, opts)
     end
 
     def resource_address
@@ -194,12 +196,12 @@ module OmfCommon
     def itype(format = nil)
       if format && !_get_core(:itype).nil?
         case format.to_sym
-        when :ruby
-          _get_core(:itype).to_s.downcase.gsub(/\./, '_')
-        when :frcp
-          _get_core(:itype).to_s.upcase.gsub(/_/, '.')
-        else
-          raise ArgumentError, "Unknown format '#{format}'. Please use ':ruby, :frcp' instead."
+          when :ruby
+            _get_core(:itype).to_s.downcase.gsub(/\./, '_')
+          when :frcp
+            _get_core(:itype).to_s.upcase.gsub(/_/, '.')
+          else
+            raise ArgumentError, "Unknown format '#{format}'. Please use ':ruby, :frcp' instead."
         end
       else
         _get_core(:itype)

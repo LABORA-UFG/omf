@@ -56,7 +56,7 @@ module OmfCommon
         # Create and authenticate, if necessary a message and pass it
         # on to 'block' if parsing (and authentication) is successful.
         #
-        def self.parse(str, content_type, &block)
+        def self.parse(str, content_type, parent_address, &block)
           #puts "CT>> #{content_type}"
           issuer = nil
           case content_type.to_s
@@ -69,7 +69,7 @@ module OmfCommon
           end
           #puts "CTTT>> #{content}::#{content.class}"
           if (content)
-            msg = new(content, issuer)
+            msg = new(content, issuer, parent_address)
             block.call(msg)
           end
         end
@@ -258,19 +258,19 @@ module OmfCommon
         end
 
         private
-        def initialize(content, issuer = nil)
+        def initialize(content, issuer = nil, parent_address={})
           debug "Create message: #{content.to_yaml}"
           unless op = content[:op]
             raise "Missing message type (:operation)"
           end
           @content = {}
           @issuer = issuer
+          @properties = content[:props] || []
           content[:op] = op.to_sym # needs to be symbol
           if src = content[:src]
-            content[:src] = OmfCommon.comm.create_topic(src)
+            content[:src] = OmfCommon.comm.create_topic(src, parent_address)
           end
           content.each {|k,v| _set_core(k, v)}
-          @properties = content[:props] || []
           #@properties = Hashie::Mash.new(content[:properties])
           @authenticate = self.class.authenticate?
           # keep track if we sent local certs on a topic. Should do this the first time

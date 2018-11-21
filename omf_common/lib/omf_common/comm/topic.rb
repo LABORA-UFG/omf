@@ -6,7 +6,6 @@
 require 'monitor'
 require 'securerandom'
 require 'openssl'
-require 'sourcify'
 
 module OmfCommon
   class Comm

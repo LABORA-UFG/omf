@@ -29,7 +29,7 @@ module OmfCommon
         # # ignore arguments
         # end
 
-        attr_reader :channel, :topic
+        attr_reader :channel, :topics
 
         # Initialize comms layer
         #
@@ -65,10 +65,12 @@ module OmfCommon
             @normal_shutdown_mode = true
           end
           info "Disconnecting..."
-          topics = OmfCommon::Comm::Topic.name2inst
-
+          topics = Hash.new.merge(OmfCommon::Comm::Topic.name2inst)
           for name, topic in topics
-            topic.unsubscribe(name, opts)
+            topic.inform(:TOPIC_DELETED, {:topic => name}) if topic.root_resource
+            info "DISCONECT TOPIC = #{name}, topic.root_resource = #{topic.root_resource}"
+            opts[:delete] = true
+            topic.unsubscribe(name, opts) if topic.root_resource
           end
 
           @session.close {
@@ -118,15 +120,12 @@ module OmfCommon
         #
         # @param [String] topic Pubsub topic name
         def delete_topic(topic, &block)
-          comm_topics = @topics.select {|t| t.id.to_s}
-          @topics.each {|t| debug "T #{t.id} EXCHANGE = #{t.exchange.to_yaml}"}
-          @channel.exchanges.each {|e| debug "EXCH = #{e[0]}"}
-          cached_topics = @channel.exchanges.keys.map {|ex| ex.to_s}
-          cached_topics.each {|t_name|
-            @channel.exchanges.delete(t_name.to_sym) unless comm_topics.include? t_name
-          }
-          cached_topics = @channel.exchanges.keys.map {|ex| ex.to_s}
-          debug "CACHED TOPICS = #{cached_topics}"
+          # FIXME CommProvider?
+          if t = OmfCommon::CommProvider::AMQP::Topic.find(topic)
+            t.release
+          else
+            warn "Attempt to delete unknown topic '#{topic}"
+          end
         end
 
         def broadcast_file(file_path, topic_name = nil, opts = {}, &block)
@@ -228,3 +227,4 @@ module OmfCommon
     end
   end
 end
+

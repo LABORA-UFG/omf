@@ -142,3 +142,4 @@ module OmfRc::ResourceProxy::Hypervisor
   end
 
 end
+

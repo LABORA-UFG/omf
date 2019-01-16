@@ -26,21 +26,21 @@ module OmfCommon
       class Communicator < OmfCommon::Comm
 
         # def initialize(opts = {})
-          # # ignore arguments
+        # # ignore arguments
         # end
 
-        attr_reader :channel, :topics
+        attr_reader :channel, :topic
 
         # Initialize comms layer
         #
         def init(opts = {})
           @lock = Monitor.new
           @opts = {
-            #:ssl (Hash) TLS (SSL) parameters to use.
-            heartbeat: 20, # (Fixnum) - default: 0 Connection heartbeat, in seconds. 0 means no heartbeat. Can also be configured server-side starting with RabbitMQ 3.0.
-            #:on_tcp_connection_failure (#call) - A callable object that will be run if connection to server fails
-            #:on_possible_authentication_failure (#call) - A callable object that will be run if authentication fails (see Authentication failure section)
-            reconnect_delay: 20 # (Fixnum) - Delay in seconds before attempting reconnect on detected failure
+              #:ssl (Hash) TLS (SSL) parameters to use.
+              heartbeat: 20, # (Fixnum) - default: 0 Connection heartbeat, in seconds. 0 means no heartbeat. Can also be configured server-side starting with RabbitMQ 3.0.
+              #:on_tcp_connection_failure (#call) - A callable object that will be run if connection to server fails
+              #:on_possible_authentication_failure (#call) - A callable object that will be run if authentication fails (see Authentication failure section)
+              reconnect_delay: 20 # (Fixnum) - Delay in seconds before attempting reconnect on detected failure
           }.merge(opts)
 
           unless (@url = @opts.delete(:url))
@@ -66,6 +66,7 @@ module OmfCommon
           end
           info "Disconnecting..."
           topics = OmfCommon::Comm::Topic.name2inst
+
           for name, topic in topics
             topic.unsubscribe(name, opts)
           end
@@ -117,12 +118,15 @@ module OmfCommon
         #
         # @param [String] topic Pubsub topic name
         def delete_topic(topic, &block)
-          # FIXME CommProvider?
-          if t = OmfCommon::CommProvider::AMQP::Topic.find(topic)
-            t.release
-          else
-            warn "Attempt to delete unknown topic '#{topic}"
-          end
+          comm_topics = @topics.select {|t| t.id.to_s}
+          @topics.each {|t| debug "T #{t.id} EXCHANGE = #{t.exchange.to_yaml}"}
+          @channel.exchanges.each {|e| debug "EXCH = #{e[0]}"}
+          cached_topics = @channel.exchanges.keys.map {|ex| ex.to_s}
+          cached_topics.each {|t_name|
+            @channel.exchanges.delete(t_name.to_sym) unless comm_topics.include? t_name
+          }
+          cached_topics = @channel.exchanges.keys.map {|ex| ex.to_s}
+          debug "CACHED TOPICS = #{cached_topics}"
         end
 
         def broadcast_file(file_path, topic_name = nil, opts = {}, &block)
@@ -181,7 +185,7 @@ module OmfCommon
               end
             end
             # @session.on_tcp_connection_loss do
-              # _reconnect "Appear to have lost tcp connection. Attempt to reconnect in #{rec_delay} sec"
+            # _reconnect "Appear to have lost tcp connection. Attempt to reconnect in #{rec_delay} sec"
             # end
             @session.on_skipped_heartbeats do
               info '... on_skipped_heartbeats!'

@@ -26,7 +26,8 @@ module OmfCommon
             begin
               block.call()
             rescue  => ex
-              error "Exception '#{ex}'"
+              error "em.rb - after: Exception '#{ex}'"
+              error "#{ex}\n\t#{ex.backtrace.join("\n\t")}"
               debug "#{ex}\n\t#{ex.backtrace.join("\n\t")}"
             end
           end
@@ -45,7 +46,7 @@ module OmfCommon
           begin
             block.call()
           rescue  => ex
-            error "Exception '#{ex}'"
+            error "em.rb - defer: Exception '#{ex}'"
             debug "#{ex}\n\t#{ex.backtrace.join("\n\t")}"
           end
         end
@@ -62,17 +63,17 @@ module OmfCommon
         # and exception at this time.
         raise "Can't handle 'every' registration before the EM is up" unless EM.reactor_running?
         # if EM.reactor_running?
-          # EM.add_periodic_timer(interval_sec, &block)
+        # EM.add_periodic_timer(interval_sec, &block)
         # else
-          # @deferred << lambda do
-            # EM.add_periodic_timer(interval_sec, &block)
-          # end
+        # @deferred << lambda do
+        # EM.add_periodic_timer(interval_sec, &block)
+        # end
         # end
         t = EM.add_periodic_timer(interval_sec) do
           begin
             block.call(t)
           rescue  => ex
-            error "Exception '#{ex}'"
+            error "em.rb - every: Exception '#{ex}'"
             debug "#{ex}\n\t#{ex.backtrace.join("\n\t")}"
           end
         end

@@ -41,12 +41,23 @@ module OmfCommon
           end
         end
 
+        #        def unsubscribe(key, opts={}, &block)
+        #          super
+        #          debug "Unsubscribing from topic: #{key}"
+        #          if opts[:delete]# and not @root_resource
+        #            debug "Deleting topic: #{key}, @children = #{@children}, @subtopics = #{@subtopics}"
+        #            @exchange.delete
+        #            channel = @communicator.channel
+        #            channel.exchanges.delete(key.to_sym)
+        #          end
+        #        end
+
         def unsubscribe(key, opts={}, &block)
           super
           debug "Unsubscribing from topic: #{key}"
           if opts[:delete]
             debug "Deleting topic: #{key}, @children = #{@children}, @subtopics = #{@subtopics}"
-            @subtopics.each {|subtopic| @@name2inst[subtopic].unsubscribe(subtopic, opts)}
+            #@subtopics.each {|subtopic| @@name2inst[subtopic].unsubscribe(subtopic, opts)}
             if @children and opts[:release_childs]
               @children.each_with_index do |child, index|
                 if index == @children.size - 1
@@ -65,8 +76,10 @@ module OmfCommon
               channel.exchanges.delete(key.to_sym)
             end
           end
+          @exchange.delete
+          channel = @communicator.channel
+          channel.exchanges.delete(key.to_sym)
         end
-
 
         private
 
@@ -82,7 +95,9 @@ module OmfCommon
           # Monitor o.op & o.info by default
           @routing_key = opts[:routing_key] || "o.*"
           @new_topic = opts[:new_topic] || false
-          @parent = opts[:parent] || "orphan"
+          debug "OPTS[:PARENT] = #{opts[:parent]}"
+          #@parent = opts[:parent] || "orphan"
+          @parent = opts[:parent] || @id || {:parent_address => "orphan"}
 
           _init_amqp
         end
@@ -110,7 +125,9 @@ module OmfCommon
               debug "Received message on #{@address} | #{@routing_key}"
               MPReceived.inject(Time.now.to_f, @address, payload.to_s[/mid\":\"(.{36})/, 1]) if OmfCommon::Measure.enabled?
               # TODO change parse to include the @address as the parent of the topic
+              debug "PARENT ADDRESS IN SUBSCRIBE = #{@parent}, I am #{self.id}"
               Message.parse(payload, headers.content_type, parent_address=@parent) do |msg|
+#              Message.parse(payload, headers.content_type) do |msg|
                 on_incoming_message(msg)
               end
             end
@@ -133,3 +150,4 @@ module OmfCommon
     end # module
   end # module
 end # module
+

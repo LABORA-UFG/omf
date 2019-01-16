@@ -58,19 +58,9 @@ module OmfRc::ResourceProxy::VirtualNode
   end
 
   hook :before_create do |node, type, opts|
-    prefix = ""
-    if opts[:federate]
-      prefix = "fed-#{opts[:domain]}-"
-    end
-
-    if type.to_sym == :application
-      opts[:uid] = "#{prefix}#{@vm_mac}-application-#{opts[:hrn]}"
-    end
-
     if type.to_sym == :net
       net_dev = node.request_devices.find do |v|
         v[:name] == opts[:if_name]
-        opts[:uid] = "#{prefix}#{@vm_mac}-net-#{opts[:if_name]}"
       end
       raise StandardError, "Device '#{opts[:if_name]}' not found" if net_dev.nil?
     end
@@ -91,7 +81,7 @@ module OmfRc::ResourceProxy::VirtualNode
   request :vm_ip do |resource|
     cmd = "/sbin/ifconfig #{resource.property.if_name} | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1"
     ip = resource.execute_cmd(cmd, "Getting the ip of #{resource.property.if_name}",
-                    "It was not possible to get the IP!", "IP was successfully got!")
+                              "It was not possible to get the IP!", "IP was successfully got!")
     resource.check_and_return_request(ip)
   end
 
@@ -169,12 +159,12 @@ module OmfRc::ResourceProxy::VirtualNode
       @vm_topic.request([:user_public_keys]) do |msg|
         vm_keys = msg[:user_public_keys]
         if not vm_keys.nil? and vm_keys.kind_of?(::Array)
-            vm_keys.each do |key|
-              key[:ssh_key] = Base64.decode64(key[:ssh_key]) if key[:is_base64]
-              cmd = "echo '#{key[:ssh_key]}' >> /root/.ssh/authorized_keys"
-              resource.execute_cmd(cmd, "Adding user public key '#{key[:ssh_key]}' to authorized_keys",
-                              "Cannot add public key", "Public key succesfully added")
-            end
+          vm_keys.each do |key|
+            key[:ssh_key] = Base64.decode64(key[:ssh_key]) if key[:is_base64]
+            cmd = "echo '#{key[:ssh_key]}' >> /root/.ssh/authorized_keys"
+            resource.execute_cmd(cmd, "Adding user public key '#{key[:ssh_key]}' to authorized_keys",
+                                 "Cannot add public key", "Public key succesfully added")
+          end
         else
           resource.inform_error("User public keys in wrong format. They must be Array but is #{vm_keys.class}") unless vm_keys.nil?
           resource.inform_error("User public keys are nil.") if vm_keys.nil?

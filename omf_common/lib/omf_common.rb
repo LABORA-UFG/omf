@@ -27,112 +27,112 @@ Encoding.default_internal = Encoding::UTF_8
 
 module OmfCommon
   DEFAULTS = {
-    development: {
-      eventloop: {
-        type: 'em'
-      },
-      logging: {
-        level: {
-          default: 'debug'
-        },
-        appenders: {
-          stdout: {
-            date_pattern: '%H:%M:%S',
-            pattern: '%d %5l %c{2}: %m\n',
-            color_scheme: 'none'
+      development: {
+          eventloop: {
+              type: 'em'
+          },
+          logging: {
+              level: {
+                  default: 'debug'
+              },
+              appenders: {
+                  stdout: {
+                      date_pattern: '%H:%M:%S',
+                      pattern: '%d %5l %c{2}: %m\n',
+                      color_scheme: 'none'
+                  }
+              }
           }
-        }
-      }
-    },
-    production: {
-      eventloop: {
-        type: :em
       },
-      logging: {
-        level: {
-          default: 'info'
-        },
-        appenders: {
-          rolling_file: {
-            log_dir: '/var/log',
-            size: 10240,
-            keep: 1,
-            date_pattern: '%F %T %z',
-            pattern: '[%d] %-5l %c: %m\n'
-          }
-        }
+      production: {
+          eventloop: {
+              type: :em
+          },
+          logging: {
+              level: {
+                  default: 'info'
+              },
+              appenders: {
+                  rolling_file: {
+                      log_dir: '/var/log',
+                      size: 10240,
+                      keep: 1,
+                      date_pattern: '%F %T %z',
+                      pattern: '[%d] %-5l %c: %m\n'
+                  }
+              }
 
-      }
-    },
-    daemon: {
-      daemonize: {
-        dir_mode: :script,
-        dir: '/tmp',
-        backtrace: true,
-        log_dir: '/var/log',
-        log_output: true
-      },
-      eventloop: {
-        type: :em
-      },
-      logging: {
-        level: {
-          default: 'info'
-        },
-        appenders: {
-          file: {
-            log_dir: '/var/log',
-            #log_file: 'foo.log',
-            date_pattern: '%F %T %z',
-            pattern: '[%d] %-5l %c: %m\n'
           }
-        }
+      },
+      daemon: {
+          daemonize: {
+              dir_mode: :script,
+              dir: '/tmp',
+              backtrace: true,
+              log_dir: '/var/log',
+              log_output: true
+          },
+          eventloop: {
+              type: :em
+          },
+          logging: {
+              level: {
+                  default: 'info'
+              },
+              appenders: {
+                  file: {
+                      log_dir: '/var/log',
+                      #log_file: 'foo.log',
+                      date_pattern: '%F %T %z',
+                      pattern: '[%d] %-5l %c: %m\n'
+                  }
+              }
 
-      }
-    },
-    local: {
-      communication: {
-        type: :local,
-      },
-      eventloop: { type: :local},
-      logging: {
-        level: {
-          default: 'debug'
-        },
-        appenders: {
-          stdout: {
-            date_pattern: '%H:%M:%S',
-            pattern: '%d %5l %c{2}: %m\n',
-            color_scheme: 'none'
           }
-        }
-      }
-    },
-    test_daemon: {
-      daemonize: {
-        dir_mode: :script,
-        dir: '/tmp',
-        backtrace: true,
-        log_dir: '/tmp',
-        log_output: true
       },
-      eventloop: {
-        type: :em
-      },
-      logging: {
-        level: {
-          default: 'debug'
-        },
-        appenders: {
-          file: {
-            log_dir: '/tmp',
-            #log_file: 'foo.log',
-            date_pattern: '%F %T %z',
-            pattern: '[%d] %-5l %c: %m\n'
+      local: {
+          communication: {
+              type: :local,
+          },
+          eventloop: { type: :local},
+          logging: {
+              level: {
+                  default: 'debug'
+              },
+              appenders: {
+                  stdout: {
+                      date_pattern: '%H:%M:%S',
+                      pattern: '%d %5l %c{2}: %m\n',
+                      color_scheme: 'none'
+                  }
+              }
           }
-        }
+      },
+      test_daemon: {
+          daemonize: {
+              dir_mode: :script,
+              dir: '/tmp',
+              backtrace: true,
+              log_dir: '/tmp',
+              log_output: true
+          },
+          eventloop: {
+              type: :em
+          },
+          logging: {
+              level: {
+                  default: 'debug'
+              },
+              appenders: {
+                  file: {
+                      log_dir: '/tmp',
+                      #log_file: 'foo.log',
+                      date_pattern: '%F %T %z',
+                      pattern: '[%d] %-5l %c: %m\n'
+                  }
+              }
+          }
       }
-    }
   }
 
   # Initialise the OMF runtime.
@@ -255,10 +255,10 @@ module OmfCommon
   def self.load_yaml(file_name, opts = {})
     if path_opt = opts[:path]
       case path_opt
-      when :same
-        file_name = File.join(File.dirname($0), file_name)
-      else
-        raise "Unknown value '#{path_opt}' for 'path' option"
+        when :same
+          file_name = File.join(File.dirname($0), file_name)
+        else
+          raise "Unknown value '#{path_opt}' for 'path' option"
       end
     end
     if readable_check = opts[:wait_for_readable]
@@ -352,10 +352,10 @@ module OmfCommon
       logger.clear_appenders
       appenders.each do |type, topts|
         pattern_opts = {
-          pattern:  topts.delete(:pattern),
-          date_pattern: topts.delete(:date_pattern),
-          color_scheme: topts.delete(:color_scheme),
-          date_method: topts.delete(:date_method)
+            pattern:  topts.delete(:pattern),
+            date_pattern: topts.delete(:date_pattern),
+            color_scheme: topts.delete(:color_scheme),
+            date_method: topts.delete(:date_method)
         }
 
         if pattern_opts[:pattern]
@@ -365,18 +365,18 @@ module OmfCommon
         end
 
         case type.to_sym
-        when :stdout
-          $stdout.sync = true
-          logger.add_appenders(Logging.appenders.stdout('custom_stdout', appender_opts))
-        when :file, :rolling_file
-          dir_name = topts.delete(:log_dir) || DEF_LOG_DIR
-          file_name = topts.delete(:log_file) || "#{File.basename($0, File.extname($0))}.log"
-          path = File.join(dir_name, file_name)
-          logger.add_appenders(Logging.appenders.send(type, path, appender_opts))
-        when :oml4r
-          logger.add_appenders(Logging.appenders.oml4r('oml4r', appender_opts))
-        else
-          raise "Unknown logging appender type '#{type}'"
+          when :stdout
+            $stdout.sync = true
+            logger.add_appenders(Logging.appenders.stdout('custom_stdout', appender_opts))
+          when :file, :rolling_file
+            dir_name = topts.delete(:log_dir) || DEF_LOG_DIR
+            file_name = topts.delete(:log_file) || "#{File.basename($0, File.extname($0))}.log"
+            path = File.join(dir_name, file_name)
+            logger.add_appenders(Logging.appenders.send(type, path, appender_opts))
+          when :oml4r
+            logger.add_appenders(Logging.appenders.oml4r('oml4r', appender_opts))
+          else
+            raise "Unknown logging appender type '#{type}'"
         end
       end
     end
@@ -414,12 +414,12 @@ module OmfCommon
     unless file_path.nil?
       l_cfg_mime_type = File.extname(file_path)
       case l_cfg_mime_type
-      when /rb/
-        load file_path
-      when /yml|yaml/
-        Logging::Config::YamlConfigurator.load(file_path)
-      else
-        warn "Invalid config file format for logging, please use Ruby or Yaml."
+        when /rb/
+          load file_path
+        when /yml|yaml/
+          Logging::Config::YamlConfigurator.load(file_path)
+        else
+          warn "Invalid config file format for logging, please use Ruby or Yaml."
       end
     end
   end

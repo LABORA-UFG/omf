@@ -542,19 +542,19 @@ module OmfRc::ResourceProxy::VirtualMachine
 
   work :stop_vm do |res|
     vm_state = res.check_vm_state(res)
+    res.property.monitoring_vm_state = false
+    res.property.state = BROKER_STATUS_DOWN
 
     if vm_state == STATE_RUNNING
       set_broker_info(res, {:status => BROKER_STATUS_SHOOTING_DOWN})
       res.property.state = BROKER_STATUS_SHOOTING_DOWN
       res.send("stop_vm_with_#{res.property.virt_mngt}")
+      res.release_actions
     else
       res.inform(:status, Hashie::Mash.new({:vm_return => "VM stopped successfully"}))
       res.log_inform_warn "Cannot stop VM: it is not running "+
                               "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
     end
-    res.property.monitoring_vm_state = false
-    set_broker_info(res, {:status => BROKER_STATUS_DOWN})
-    res.property.state = BROKER_STATUS_DOWN
   end
 
   work :run_vm do |res|

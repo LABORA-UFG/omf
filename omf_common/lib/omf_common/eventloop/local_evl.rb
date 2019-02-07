@@ -42,7 +42,7 @@ module OmfCommon
           begin
             block.call()
           rescue  => ex
-            @logger.error "Exception '#{ex}'"
+            @logger.error "local_evl.rb: Exception '#{ex}'"
             @logger.debug ex.backtract.join("\n\t")
           end
         end

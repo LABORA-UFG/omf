@@ -255,7 +255,7 @@ module OmfRc::ResourceProxy::VirtualMachine
   property :imOk, :default => false
   property :force_new, :default => false
   property :monitoring_vm_state, :default => false
-  @threads = []
+  property :threads, :default => []
 
   hook :before_ready do |resource|
     parent = resource.opts.parent
@@ -272,7 +272,8 @@ module OmfRc::ResourceProxy::VirtualMachine
     # broker config...
     debug "Subscribing to broker topic: #{resource.property.broker_topic_name}"
     resource.inform(:info, Hashie::Mash.new({:info => "Getting VM resource in broker, this can take a while..."}))
-    OmfCommon.comm.subscribe(resource.property.broker_topic_name, :parent_address => resource.uid) do |topic|
+    #    OmfCommon.comm.subscribe(resource.property.broker_topic_name, :parent_address => resource.uid) do |topic|
+    OmfCommon.comm.subscribe(resource.property.broker_topic_name) do |topic|
       if topic.error?
         error = "Could not subscribe to broker topic"
         resource.log_inform_error(error)
@@ -296,7 +297,7 @@ module OmfRc::ResourceProxy::VirtualMachine
 
     # Send inform message to tell EC that the VM RC are ok and he can send the configure messages
     thread = resource.send_vm_im_ok
-    @threads << thread
+    resource.property.threads << thread
   end
 
   work :send_vm_im_ok do |resource|
@@ -309,7 +310,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       end
       debug "Configure received, stopping VM_IMOK messages sending..."
     }
-    OmfCommon.el.after(15) do ||
+    OmfCommon.el.after(25) do ||
       thread.exit
       resource.release_actions unless resource.property.imOk
     end
@@ -327,24 +328,32 @@ module OmfRc::ResourceProxy::VirtualMachine
   work :release_actions do |res, from_before_release|
     res.property.monitoring_vm_state = false
     res.property.released = true
+    released_actions_done = false
     set_broker_info(res, {:status => res.property.state}) do |vm_topic|
-      res.property.broker_topic.release(vm_topic, {:delete => true}) do |msg| # am_controller.release(am_controller_urn:...)
+      res.property.broker_topic.release(vm_topic, {:delete => true}) do |msg|
 
         res.release(res.property.vm_topic)
         res.parent.remove_vm_by_uid(res.uid)
+        #res.parent.release(res.uid, {:delete => true, :release_childs => true}) unless from_before_release
         res.parent.release(res.uid, {:delete => true}) unless from_before_release
 
         topics = OmfCommon::Comm::Topic.name2inst
         for name, topic in topics
           mac_regex = Regexp.new(Regexp.quote(res.property.mac_address))
           am_controller_topic_regex = Regexp.new(Regexp.quote(vm_topic.id))
+          debug "REGEX: #{mac_regex}, #{am_controller_topic_regex}"
           if name =~ mac_regex or name =~ am_controller_topic_regex
             topic.unsubscribe(name, {:delete => true})
             OmfCommon::Comm::Topic.name2inst.delete(name)
           end
         end
-        @threads.each {|thr| thr.exit}
+        res.property.threads.each {|thr| thr.exit}
       end
+      released_actions_done = true
+    end
+    until released_actions_done
+      debug "Waiting for released_actions_done..."
+      sleep 2
     end
   end
 
@@ -424,7 +433,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       res.send("#{act}_vm")
     }
     res.property.action = value
-    @threads << thread
+    res.property.threads << thread
   end
 
   work :build_vm do |res|
@@ -453,7 +462,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       vm_is_running = true
     end
 
-    res.property.vm_topic = res.get_vm_node_topic # topic with mac address
+    res.property.vm_topic = res.get_vm_node_topic
 
     # ----Setting up broker vm info ----
     is_created = !(res.property.vm_topic.include? "error:")
@@ -533,20 +542,43 @@ module OmfRc::ResourceProxy::VirtualMachine
 
   work :stop_vm do |res|
     vm_state = res.check_vm_state(res)
+    res.property.monitoring_vm_state = false
+    res.property.state = BROKER_STATUS_DOWN
 
     if vm_state == STATE_RUNNING
       set_broker_info(res, {:status => BROKER_STATUS_SHOOTING_DOWN})
       res.property.state = BROKER_STATUS_SHOOTING_DOWN
       res.send("stop_vm_with_#{res.property.virt_mngt}")
+      res.release_actions
     else
       res.inform(:status, Hashie::Mash.new({:vm_return => "VM stopped successfully"}))
       res.log_inform_warn "Cannot stop VM: it is not running "+
                               "(name: '#{res.property.vm_name}' - state: #{res.property.state})"
+
+      res.property.released = true
+      set_broker_info(res, {:status => res.property.state}) do |vm_topic|
+        res.property.broker_topic.release(vm_topic, {:delete => true}) do |msg|
+
+          res.release(res.property.vm_topic)
+          res.parent.remove_vm_by_uid(res.uid)
+          #res.parent.release(res.uid, {:delete => true, :release_childs => true}) unless from_before_release
+          res.parent.release(res.uid, {:delete => true})
+
+          topics = OmfCommon::Comm::Topic.name2inst
+          for name, topic in topics
+            am_controller_topic_regex = Regexp.new(Regexp.quote(vm_topic.id))
+            debug "REGEX: #{am_controller_topic_regex}"
+            if name =~ am_controller_topic_regex
+              topic.unsubscribe(name, {:delete => true})
+              OmfCommon::Comm::Topic.name2inst.delete(name)
+            end
+          end
+          res.property.threads.each {|thr| thr.exit}
+        end
+      end
     end
-    res.property.monitoring_vm_state = false
-    set_broker_info(res, {:status => BROKER_STATUS_DOWN})
-    res.property.state = BROKER_STATUS_DOWN
   end
+
 
   work :run_vm do |res|
     vm_state = res.check_vm_state(res)
@@ -557,7 +589,7 @@ module OmfRc::ResourceProxy::VirtualMachine
       res.send("run_vm_with_#{res.property.virt_mngt}")
 
       # Start boot monitoring
-      res.property.vm_topic = res.get_vm_node_topic # topic with mac address
+      res.property.vm_topic = res.get_vm_node_topic
       res.start_booting_monitor(res.property.vm_topic)
       res.update_vm_state(res) unless res.property.monitoring_vm_state
     else
@@ -649,7 +681,8 @@ module OmfRc::ResourceProxy::VirtualMachine
                   "seconds."
 
         started = false
-        OmfCommon.comm.subscribe(vm_topic, :parent_address => resource.uid) do |topic|
+#        OmfCommon.comm.subscribe(vm_topic, :parent_address => resource.uid) do |topic|
+        OmfCommon.comm.subscribe(vm_topic) do |topic|
           if topic.error?
             error = "Could not subscribe to broker topic"
             resource.log_inform_error(error)
@@ -676,7 +709,7 @@ module OmfRc::ResourceProxy::VirtualMachine
           end
         end
       }
-      @threads << thread
+      resource.property.threads << thread
     end
   end
 
@@ -684,7 +717,7 @@ module OmfRc::ResourceProxy::VirtualMachine
     res.property.monitoring_vm_state = true
     thread = Thread.new {
       while(res.property.monitoring_vm_state) do
-        debug "update_vm_state: Updating VM state. Thread id: #{Thread.current.object_id}"
+        debug "#{res.uid} - update_vm_state: Updating VM state. Thread id: #{Thread.current.object_id}"
         old_state = res.property.state
         state = res.check_vm_state(res)
         if state == STATE_DOWN or state == STATE_NOT_CREATED and (old_state != STATE_DOWN and old_state != STATE_NOT_CREATED)
@@ -693,7 +726,7 @@ module OmfRc::ResourceProxy::VirtualMachine
         sleep 5
       end
     }
-    @threads << thread
+    res.property.threads << thread
   end
 
   work :get_vm_node_topic do |res|
@@ -705,3 +738,4 @@ module OmfRc::ResourceProxy::VirtualMachine
     vm_topic
   end
 end
+

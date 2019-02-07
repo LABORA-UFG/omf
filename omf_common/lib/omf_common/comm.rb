@@ -10,27 +10,27 @@ module OmfCommon
   class Comm
 
     @@providers = {
-      xmpp: {
-        require: 'omf_common/comm/xmpp/communicator',
-        constructor: 'OmfCommon::Comm::XMPP::Communicator',
-        message_provider: {
-          type: :xml
+        xmpp: {
+            require: 'omf_common/comm/xmpp/communicator',
+            constructor: 'OmfCommon::Comm::XMPP::Communicator',
+            message_provider: {
+                type: :xml
+            }
+        },
+        amqp: {
+            require: 'omf_common/comm/amqp/amqp_communicator',
+            constructor: 'OmfCommon::Comm::AMQP::Communicator',
+            message_provider: {
+                type: :json
+            }
+        },
+        local: {
+            require: 'omf_common/comm/local/local_communicator',
+            constructor: 'OmfCommon::Comm::Local::Communicator',
+            message_provider: {
+                type: :json
+            }
         }
-      },
-      amqp: {
-        require: 'omf_common/comm/amqp/amqp_communicator',
-        constructor: 'OmfCommon::Comm::AMQP::Communicator',
-        message_provider: {
-          type: :json
-        }
-      },
-      local: {
-        require: 'omf_common/comm/local/local_communicator',
-        constructor: 'OmfCommon::Comm::Local::Communicator',
-        message_provider: {
-          type: :json
-        }
-      }
     }
     @@instance = nil
 
@@ -172,6 +172,7 @@ module OmfCommon
     private
     def initialize(opts = {})
       @opts = opts
+      @opts[:root_resource] = true
       unless local_address = opts[:local_address]
         hostname = nil
         begin
@@ -186,7 +187,7 @@ module OmfCommon
         local_address = "fed-#{@opts[:domain]}-#{local_address}"
       end
       on_connected do
-        @local_topic = create_topic(local_address.gsub('.', '-'))
+        @local_topic = create_topic(local_address.gsub('.', '-'), opts)
       end
     end
 

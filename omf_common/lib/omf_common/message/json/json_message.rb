@@ -17,8 +17,8 @@ module OmfCommon
         # a message to names used for the JSON message
         #
         @@key2json_key = {
-          operation: :op,
-          res_id: :rid
+            operation: :op,
+            res_id: :rid
         }
 
         def self.create(type, properties, body = {})
@@ -39,11 +39,11 @@ module OmfCommon
           end
 
           content = body.merge({
-            op: type,
-            mid: SecureRandom.uuid,
-            ts: Time.now.to_i,
-            props: properties
-          })
+                                   op: type,
+                                   mid: SecureRandom.uuid,
+                                   ts: Time.now.to_i,
+                                   props: properties
+                               })
           issuer = self.authenticate? ? (body[:issuer] || body[:src]) : nil
           self.new(content, issuer) # new message
         end
@@ -60,12 +60,12 @@ module OmfCommon
           #puts "CT>> #{content_type}"
           issuer = nil
           case content_type.to_s
-          when 'jwt'
-            content, issuer = parse_jwt(str, &block)
-          when 'text/json'
-            content = JSON.parse(str, :symbolize_names => true)
-          else
-            warn "Received message with unknown content type '#{content_type}'"
+            when 'jwt'
+              content, issuer = parse_jwt(str, &block)
+            when 'text/json'
+              content = JSON.parse(str, :symbolize_names => true)
+            else
+              warn "Received message with unknown content type '#{content_type}'"
           end
           #puts "CTTT>> #{content}::#{content.class}"
           if (content)
@@ -78,57 +78,57 @@ module OmfCommon
           key_or_secret = :skip_verification
           # Code lifted from 'json-jwt-0.4.3/lib/json/jwt.rb'
           case jwt_string.count('.')
-          when 2 # JWT / JWS
-            header, claims, signature = jwt_string.split('.', 3).collect do |segment|
-              UrlSafeBase64.decode64 segment.to_s
-            end
-            header, claims = [header, claims].collect do |json|
-              #MultiJson.load(json).with_indifferent_access
-              JSON.parse(json, :symbolize_names => true)
-            end
-            signature_base_string = jwt_string.split('.')[0, 2].join('.')
-            jwt = JSON::JWT.new claims
-            jwt.header = header
-            jwt.signature = signature
+            when 2 # JWT / JWS
+              header, claims, signature = jwt_string.split('.', 3).collect do |segment|
+                UrlSafeBase64.decode64 segment.to_s
+              end
+              header, claims = [header, claims].collect do |json|
+                #MultiJson.load(json).with_indifferent_access
+                JSON.parse(json, :symbolize_names => true)
+              end
+              signature_base_string = jwt_string.split('.')[0, 2].join('.')
+              jwt = JSON::JWT.new claims
+              jwt.header = header
+              jwt.signature = signature
 
-            # NOTE:
-            #  Some JSON libraries generates wrong format of JSON (spaces between keys and values etc.)
-            #  So we need to use raw base64 strings for signature verification.
-            unless issuer = claims[:iss]
-              warn "JWT: Message is missing :iss element"
+              # NOTE:
+              #  Some JSON libraries generates wrong format of JSON (spaces between keys and values etc.)
+              #  So we need to use raw base64 strings for signature verification.
+              unless issuer = claims[:iss]
+                warn "JWT: Message is missing :iss element"
+                return nil
+              end
+              if cert_pem = claims[:crt]
+                # let's the credential store take care of it
+                pem = "#{OmfCommon::Auth::Certificate::BEGIN_CERT}#{cert_pem}#{OmfCommon::Auth::Certificate::END_CERT}"
+                cert = OmfCommon::Auth::Certificate.create_from_pem(pem)
+                cert.resource_id = issuer
+                OmfCommon::Auth::CertificateStore.instance.register(cert)
+              end
+
+              unless cert = OmfCommon::Auth::CertificateStore.instance.cert_for(issuer)
+                warn "JWT: Can't find cert for issuer '#{issuer}'"
+                return nil
+              end
+
+              unless OmfCommon::Auth::CertificateStore.instance.verify(cert)
+                warn "JWT: Invalid certificate '#{cert.to_s}', NOT signed by CA certs, or its CA cert NOT loaded into cert store."
+                return nil
+              end
+
+              #puts ">>> #{cert.to_x509.public_key}::#{signature_base_string}"
+              #jwt.verify signature_base_string, cert.to_x509.public_key #unless key_or_secret == :skip_verification
+              [JSON.parse(claims[:cnt], :symbolize_names => true), cert]
+            else
+              warn('JWT: Invalid Format. JWT should include 2 or 3 dots.')
               return nil
-            end
-            if cert_pem = claims[:crt]
-              # let's the credential store take care of it
-              pem = "#{OmfCommon::Auth::Certificate::BEGIN_CERT}#{cert_pem}#{OmfCommon::Auth::Certificate::END_CERT}"
-              cert = OmfCommon::Auth::Certificate.create_from_pem(pem)
-              cert.resource_id = issuer
-              OmfCommon::Auth::CertificateStore.instance.register(cert)
-            end
-
-            unless cert = OmfCommon::Auth::CertificateStore.instance.cert_for(issuer)
-              warn "JWT: Can't find cert for issuer '#{issuer}'"
-              return nil
-            end
-
-            unless OmfCommon::Auth::CertificateStore.instance.verify(cert)
-              warn "JWT: Invalid certificate '#{cert.to_s}', NOT signed by CA certs, or its CA cert NOT loaded into cert store."
-              return nil
-            end
-
-            #puts ">>> #{cert.to_x509.public_key}::#{signature_base_string}"
-            #jwt.verify signature_base_string, cert.to_x509.public_key #unless key_or_secret == :skip_verification
-            [JSON.parse(claims[:cnt], :symbolize_names => true), cert]
-          else
-            warn('JWT: Invalid Format. JWT should include 2 or 3 dots.')
-            return nil
           end
         end
 
         def each_property(&block)
           @properties.each do |k, v|
             #unless INTERNAL_PROPS.include?(k.to_sym)
-              block.call(k, v)
+            block.call(k, v)
             #end
           end
         end
@@ -231,34 +231,34 @@ module OmfCommon
           #puts @content.inspect
           payload = @content.to_json
           if self.class.authenticate?
-             unless issuer = self.issuer
-               raise "Missing ISSUER for '#{self}'"
-             end
-             if issuer.is_a? OmfCommon::Auth::CertificateStore
-               cert = issuer
-               issuer = cert.subject
-             else
-               cert = OmfCommon::Auth::CertificateStore.instance.cert_for(issuer)
-             end
-             if cert && cert.can_sign?
-               debug "Found cert for '#{issuer} - #{cert}"
-               msg = {cnt: payload, iss: issuer}
-               unless @certOnTopic[k = [topic, issuer]]
-                 # first time for this issuer on this topic, so let's send the cert along
-                 msg[:crt] = cert.to_pem_compact
-                 #ALWAYS ADD CERT @certOnTopic[k] = Time.now
-               end
-               #:RS256, :RS384, :RS512
-               p = JSON::JWT.new(msg).sign(cert.key , :RS256).to_s
-               #puts "SIGNED>> #{msg}"
-               return ['jwt', p]
-             end
+            unless issuer = self.issuer
+              raise "Missing ISSUER for '#{self}'"
+            end
+            if issuer.is_a? OmfCommon::Auth::CertificateStore
+              cert = issuer
+              issuer = cert.subject
+            else
+              cert = OmfCommon::Auth::CertificateStore.instance.cert_for(issuer)
+            end
+            if cert && cert.can_sign?
+              debug "Found cert for '#{issuer} - #{cert}"
+              msg = {cnt: payload, iss: issuer}
+              unless @certOnTopic[k = [topic, issuer]]
+                # first time for this issuer on this topic, so let's send the cert along
+                msg[:crt] = cert.to_pem_compact
+                #ALWAYS ADD CERT @certOnTopic[k] = Time.now
+              end
+              #:RS256, :RS384, :RS512
+              p = JSON::JWT.new(msg).sign(cert.key , :RS256).to_s
+              #puts "SIGNED>> #{msg}"
+              return ['jwt', p]
+            end
           end
           ['text/json', payload]
         end
 
         private
-        def initialize(content, issuer = nil, parent_address={})
+        def initialize(content, issuer = nil, parent_address=nil)
           debug "Create message: #{content.to_yaml}"
           unless op = content[:op]
             raise "Missing message type (:operation)"
@@ -268,7 +268,7 @@ module OmfCommon
           @properties = content[:props] || []
           content[:op] = op.to_sym # needs to be symbol
           if src = content[:src]
-            content[:src] = OmfCommon.comm.create_topic(src, parent_address)
+            content[:src] = OmfCommon.comm.create_topic(src, {:parent_address => parent_address})
           end
           content.each {|k,v| _set_core(k, v)}
           #@properties = Hashie::Mash.new(content[:properties])
@@ -300,3 +300,4 @@ module OmfCommon
     end
   end
 end
+

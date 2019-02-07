@@ -6,6 +6,7 @@
 require 'monitor'
 require 'securerandom'
 require 'openssl'
+require 'sourcify'
 
 module OmfCommon
   class Comm
@@ -15,6 +16,7 @@ module OmfCommon
       @@lock = Monitor.new
       @children = []
       @subtopics = []
+      @root_resource = false
 
       def self.name2inst
         return @@name2inst
@@ -32,6 +34,17 @@ module OmfCommon
             debug "Existing topic: #{name} | #{@@name2inst[name].routing_key}"
             block.call(@@name2inst[name]) if block
           end
+          @root_resource = opts[:root_resource]
+          unless @root_resource
+            @@name2inst[name].on_inform do |msg|
+              debug "#{name}: MESSAGE ON INFORM IS #{msg.itype}"
+              case msg.itype
+                when 'TOPIC.DELETED'
+                  debug "MESSAGE TO DELETE TOPIC: #{msg[:topic]}"
+                  @@name2inst[name].unsubscribe(msg[:topic], {:delete => true})
+              end
+            end
+          end
           @@name2inst[name]
         end
       end
@@ -40,7 +53,7 @@ module OmfCommon
         @@name2inst[name]
       end
 
-      attr_reader :id, :routing_key, :children
+      attr_reader :id, :routing_key, :children, :root_resource
 
       # Request the creation of a new resource. Returns itself
       #
@@ -75,6 +88,7 @@ module OmfCommon
           raise ArgumentError, "Expected '#{self.class}', but got '#{resource.class}'"
         end
         core_props[:src] ||= OmfCommon.comm.local_address
+        debug "Release message: #{OmfCommon.comm.local_address}"
         msg = OmfCommon::Message.create(:release, {}, core_props.merge(res_id: resource.id))
         publish(msg, { routing_key: "o.op" }, &block)
         self
@@ -154,11 +168,15 @@ module OmfCommon
       end
 
       def add_child(child_id)
-        @children << child_id
+        @lock.synchronize do
+          @children << child_id
+        end
       end
 
       def add_subtopic(topic_id)
-        @subtopics << topic_id
+        @lock.synchronize do
+          @subtopics << topic_id
+        end
       end
 
       private
@@ -174,6 +192,7 @@ module OmfCommon
         end
         if opts[:parent_address]
           parent_address = opts[:parent_address] || "orphan"
+          #parent_address = parent_address[:parent_address] if parent_address.is_a? Hash
           parent_address = parent_address.to_sym
           if @@name2inst[parent_address]
             @@name2inst[parent_address].add_subtopic(id)
@@ -185,6 +204,8 @@ module OmfCommon
         @context2cbk = {}
         @children = []
         @subtopics = []
+        #@root_resource = false
+        @root_resource = opts[:root_resource]
       end
 
       # _send_message will also register callbacks for reply messages by default

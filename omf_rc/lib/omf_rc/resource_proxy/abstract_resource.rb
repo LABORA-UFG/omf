@@ -85,8 +85,8 @@ class OmfRc::ResourceProxy::AbstractResource
   RELEASE_WAIT = 5
 
   DEFAULT_CREATION_OPTS = {
-    suppress_create_message: false,
-    create_children_resources: true
+      suppress_create_message: false,
+      create_children_resources: true
   }
 
   @@defaults = Hashie::Mash.new
@@ -166,7 +166,8 @@ class OmfRc::ResourceProxy::AbstractResource
 
     parent_uid = @parent.uid if @parent
 
-    OmfCommon.comm.subscribe(@uid, routing_key: "o.op", parent: parent_uid) do |t|
+    OmfCommon.comm.subscribe(@uid, routing_key: "o.op", parent: parent_uid, root_resource: creation_opts[:root_resource]) do |t|
+#    OmfCommon.comm.subscribe(@uid, routing_key: "o.op", root_resource: creation_opts[:root_resource]) do |t|
       @topics << t
 
       if t.error?
@@ -309,7 +310,7 @@ class OmfRc::ResourceProxy::AbstractResource
       else
         child = nil
       end
-      debug "#{child.uid} released"
+      debug "#{self.uid}: #{child.uid} released"
     else
       debug "#{res_id} does not belong to #{self.uid}(#{self.hrn}) - #{@children.map(&:uid).inspect}"
     end
@@ -336,22 +337,27 @@ class OmfRc::ResourceProxy::AbstractResource
     call_hook(:before_release, self)
 
     props = {
-      res_id: resource_address
+        res_id: resource_address
     }
     props[:hrn] = hrn if hrn
     inform :released, props
 
+    opts[:release_childs] = true
     # clean up topics
     @topics.each do |t|
-      t.unsubscribe(@uid, {:delete => true, :release_childs => true})
+      t.unsubscribe(@uid, opts)
     end
+    # clean up topics
+    # @topics.each do |t|
+    #   t.unsubscribe(@uid, {:delete => true, :release_childs => true})
+    # end
 
-    @membership_topics.each_value do |t|
-      if t.respond_to? :delete_on_message_cbk_by_id
-        t.delete_on_message_cbk_by_id(@uid)
-      end
-      t.unsubscribe(@uid)
-    end
+    #@membership_topics.each_value do |t|
+    #  if t.respond_to? :delete_on_message_cbk_by_id
+    #    t.delete_on_message_cbk_by_id(@uid)
+    #  end
+    #  t.unsubscribe(@uid)
+    #end
 
     true
   end
@@ -442,11 +448,11 @@ class OmfRc::ResourceProxy::AbstractResource
   #
   def configure_membership(*args)
     case args[0]
-    when Symbol, String, Array
-      new_membership = [args[0]].flatten.compact
-    when Hash
-      leave_membership = [args[0][:leave]].flatten.compact
-      only_membership = [args[0][:only]].flatten.compact
+      when Symbol, String, Array
+        new_membership = [args[0]].flatten.compact
+      when Hash
+        leave_membership = [args[0][:leave]].flatten.compact
+        only_membership = [args[0][:only]].flatten.compact
     end
 
     new_membership && new_membership.each do |new_m|
@@ -520,7 +526,7 @@ class OmfRc::ResourceProxy::AbstractResource
 
     objects_by_topic(topic.id.to_s).each do |obj|
       OmfRc::ResourceProxy::MPReceived.inject(Time.now.to_f, self.uid,
-        topic.id.to_s, message.mid) if OmfCommon::Measure.enabled?
+                                              topic.id.to_s, message.mid) if OmfCommon::Measure.enabled?
       execute_omf_operation(message, obj, topic)
     end
   end
@@ -543,14 +549,14 @@ class OmfRc::ResourceProxy::AbstractResource
     end
 
     case message.operation
-    #when :create
-    #  inform(:creation_ok, response_h, topic)
-    when :request, :configure
-      inform(:status, response_h, topic)
-    when :release
-      OmfCommon.eventloop.after(RELEASE_WAIT) do
-        inform(:released, response_h, topic) if response_h[:res_id]
-      end
+      #when :create
+      #  inform(:creation_ok, response_h, topic)
+      when :request, :configure
+        inform(:status, response_h, topic)
+      when :release
+        OmfCommon.eventloop.after(RELEASE_WAIT) do
+          inform(:released, response_h, topic) if response_h[:res_id]
+        end
     end
   end
 
@@ -573,14 +579,14 @@ class OmfRc::ResourceProxy::AbstractResource
     response.replyto = replyto_address(obj, message.replyto)
 
     case message.operation
-    when :create
-      handle_create_message(message, obj, response)
-    when :request
-      handle_request_message(message, obj, response)
-    when :configure
-      handle_configure_message(message, obj, response)
-    when :release
-      handle_release_message(message, obj, response)
+      when :create
+        handle_create_message(message, obj, response)
+      when :request
+        handle_request_message(message, obj, response)
+      when :configure
+        handle_configure_message(message, obj, response)
+      when :release
+        handle_release_message(message, obj, response)
     end
     response
   end
@@ -712,8 +718,8 @@ class OmfRc::ResourceProxy::AbstractResource
       inform_data = Hashie::Mash.new(inform_data) if inform_data.class == Hash
       #idata = inform_data.dup
       idata = {
-        src: address,
-        type: self.type  # NOTE: Should we add the object's type as well???
+          src: address,
+          type: self.type  # NOTE: Should we add the object's type as well???
       }
       message = OmfCommon::Message.create_inform_message(itype.to_s.upcase, inform_data, idata)
     else
@@ -729,7 +735,7 @@ class OmfRc::ResourceProxy::AbstractResource
     (membership_topics.map { |mt| mt[1] } + @topics).each do |t|
       t.publish(message, { routing_key: "o.info" })
       OmfRc::ResourceProxy::MPPublished.inject(Time.now.to_f,
-        self.uid, t.id, message.mid) if OmfCommon::Measure.enabled?
+                                               self.uid, t.id, message.mid) if OmfCommon::Measure.enabled?
     end
   end
 
@@ -856,3 +862,4 @@ class OmfRc::ResourceProxy::AbstractResource
   end
 
 end
+

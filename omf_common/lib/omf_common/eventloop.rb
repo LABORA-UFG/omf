@@ -8,14 +8,14 @@ module OmfCommon
   class Eventloop
 
     @@providers = {
-      em: {
-        require: 'omf_common/eventloop/em',
-        constructor: 'OmfCommon::Eventloop::EventMachine'
-      },
-      local: {
-        require: 'omf_common/eventloop/local_evl',
-        constructor: 'OmfCommon::Eventloop::Local'
-      }
+        em: {
+            require: 'omf_common/eventloop/em',
+            constructor: 'OmfCommon::Eventloop::EventMachine'
+        },
+        local: {
+            require: 'omf_common/eventloop/local_evl',
+            constructor: 'OmfCommon::Eventloop::Local'
+        }
     }
     @@instance = nil
     @@on_stop_proc = []
@@ -89,7 +89,7 @@ module OmfCommon
         begin
           block.call()
         rescue  => ex
-          error "Exception '#{ex}'"
+          error "Eventloop.rb: Exception '#{ex}'"
           debug "#{ex}\n\t#{ex.backtrace.join("\n\t")}"
         end
       end

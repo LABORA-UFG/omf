@@ -26,7 +26,7 @@ module OmfCommon
       class Communicator < OmfCommon::Comm
 
         # def initialize(opts = {})
-          # # ignore arguments
+        # # ignore arguments
         # end
 
         attr_reader :channel, :topics
@@ -36,11 +36,11 @@ module OmfCommon
         def init(opts = {})
           @lock = Monitor.new
           @opts = {
-            #:ssl (Hash) TLS (SSL) parameters to use.
-            heartbeat: 20, # (Fixnum) - default: 0 Connection heartbeat, in seconds. 0 means no heartbeat. Can also be configured server-side starting with RabbitMQ 3.0.
-            #:on_tcp_connection_failure (#call) - A callable object that will be run if connection to server fails
-            #:on_possible_authentication_failure (#call) - A callable object that will be run if authentication fails (see Authentication failure section)
-            reconnect_delay: 20 # (Fixnum) - Delay in seconds before attempting reconnect on detected failure
+              #:ssl (Hash) TLS (SSL) parameters to use.
+              heartbeat: 20, # (Fixnum) - default: 0 Connection heartbeat, in seconds. 0 means no heartbeat. Can also be configured server-side starting with RabbitMQ 3.0.
+              #:on_tcp_connection_failure (#call) - A callable object that will be run if connection to server fails
+              #:on_possible_authentication_failure (#call) - A callable object that will be run if authentication fails (see Authentication failure section)
+              reconnect_delay: 20 # (Fixnum) - Delay in seconds before attempting reconnect on detected failure
           }.merge(opts)
 
           unless (@url = @opts.delete(:url))
@@ -65,9 +65,12 @@ module OmfCommon
             @normal_shutdown_mode = true
           end
           info "Disconnecting..."
-          topics = OmfCommon::Comm::Topic.name2inst
+          topics = Hash.new.merge(OmfCommon::Comm::Topic.name2inst)
           for name, topic in topics
-            topic.unsubscribe(name, opts)
+            topic.inform(:TOPIC_DELETED, {:topic => name}) if topic.root_resource
+            info "DISCONECT TOPIC = #{name}, topic.root_resource = #{topic.root_resource}"
+            opts[:delete] = true
+            topic.unsubscribe(name, opts) if topic.root_resource
           end
 
           @session.close {
@@ -181,7 +184,7 @@ module OmfCommon
               end
             end
             # @session.on_tcp_connection_loss do
-              # _reconnect "Appear to have lost tcp connection. Attempt to reconnect in #{rec_delay} sec"
+            # _reconnect "Appear to have lost tcp connection. Attempt to reconnect in #{rec_delay} sec"
             # end
             @session.on_skipped_heartbeats do
               info '... on_skipped_heartbeats!'
@@ -224,3 +227,4 @@ module OmfCommon
     end
   end
 end
+

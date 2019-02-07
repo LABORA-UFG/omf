@@ -166,6 +166,7 @@ module OmfCommon
     def resource
       name = _get_property(:res_id)
       parent = _get_property(:parent)
+      debug "PARENT IN MESSAGE IS = #{parent[:uid].to_sym}"
       opts = {:parent => parent[:uid].to_sym}
       OmfCommon.comm.create_topic(name, opts)
     end

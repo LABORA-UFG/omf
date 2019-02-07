@@ -369,9 +369,9 @@ module OmfEc
     # Archive OEDL content to OML db
     def archive_oedl(script_name)
       log_metadata(
-        script_name,
-        Base64.encode64(Zlib::Deflate.deflate(File.read(script_name))),
-        "oedl_content"
+          script_name,
+          Base64.encode64(Zlib::Deflate.deflate(File.read(script_name))),
+          "oedl_content"
       )
     end
 
@@ -392,7 +392,7 @@ module OmfEc
         req.body = JSON.pretty_generate(job)
         res = Net::HTTP.new(u.host, u.port).start {|http| http.request(req) }
         raise "Could not create a job for this experiment trial\n"+
-              "Response #{res.code} #{res.message}:\n#{res.body}" unless res.kind_of? Net::HTTPSuccess
+                  "Response #{res.code} #{res.message}:\n#{res.body}" unless res.kind_of? Net::HTTPSuccess
         job = JSON.parse(res.body)
         raise "No valid URL received for the created job for this experiment trial" if job['href'].nil?
         @job_url = job['href']
@@ -436,8 +436,9 @@ module OmfEc
               unless vmg.app_contexts.empty?
                 info "Release vm group '#{vmg.name}' applications"
                 vmg.releaseApplications
-                vmg.releaseVMs
               end
+              info "Release vms of vm group '#{vmg.name}'"
+              vmg.releaseVMs
             end
           end
 
@@ -504,3 +505,4 @@ module OmfEc
     end
   end
 end
+

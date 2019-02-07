@@ -34,13 +34,13 @@ module OmfRc::ResourceProxy::VirtualNode
         resource.inform_error("Could not subscribe to broker topic")
       else
         @broker_topic = topic
-        debug "Creating broker virtual machine resource with mac_address: #{@vm_mac}"
-        @broker_topic.create(:virtual_machine, {:mac_address => @vm_mac}) do |msg|
+        debug "Creating broker vm inventory resource with mac_address: #{@vm_mac}"
+        @broker_topic.create(:vm_inventory, {:mac_address => @vm_mac}) do |msg|
           if msg.error?
-            resource.inform_error("Could not create broker virtual machine resource topic #{msg}")
+            resource.inform_error("Could not create broker vm inventory resource topic #{msg}")
           else
             @vm_topic = msg.resource
-            info_msg = "Broker virtual machine resource created successfully! VM_TOPIC: #{@vm_topic}"
+            info_msg = "Broker vm inventory resource created successfully! VM_TOPIC: #{@vm_topic}"
             resource.inform(:info, Hashie::Mash.new({:info => info_msg}))
             Thread.new {
               info_msg = 'Waiting 30 seconds to finalize VM setup with broker...'

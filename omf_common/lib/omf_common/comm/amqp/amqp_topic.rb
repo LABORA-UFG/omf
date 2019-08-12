@@ -108,7 +108,7 @@ module OmfCommon
 
           hostname = (`hostname` || 'unknown').strip
           queue_name = "#{hostname}-#{Process.pid}_#{@parent}_#{@id}-#{SecureRandom.uuid}"
-          channel.queue(queue_name, :auto_delete => true) do |queue|
+          channel.queue(queue_name, :auto_delete => true, :durable => true) do |queue|
             queue.bind(@exchange, routing_key: @routing_key) do ||
               debug "Subscribed to '#@id'"
               # Call all accumulated on_subscribed handlers

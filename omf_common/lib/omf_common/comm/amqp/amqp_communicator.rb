@@ -30,25 +30,30 @@ module OmfCommon
         # end
 
         attr_reader :channel, :topics
+        @@is_initialized = nil
 
         # Initialize comms layer
         #
         def init(opts = {})
-          @lock = Monitor.new
-          @opts = {
-              #:ssl (Hash) TLS (SSL) parameters to use.
-              heartbeat: 20, # (Fixnum) - default: 0 Connection heartbeat, in seconds. 0 means no heartbeat. Can also be configured server-side starting with RabbitMQ 3.0.
-              #:on_tcp_connection_failure (#call) - A callable object that will be run if connection to server fails
-              #:on_possible_authentication_failure (#call) - A callable object that will be run if authentication fails (see Authentication failure section)
-              reconnect_delay: 20 # (Fixnum) - Delay in seconds before attempting reconnect on detected failure
-          }.merge(opts)
+          unless @@is_initialized
+            @lock = Monitor.new
+            @opts = {
+                #:ssl (Hash) TLS (SSL) parameters to use.
+                heartbeat: 20, # (Fixnum) - default: 0 Connection heartbeat, in seconds. 0 means no heartbeat. Can also be configured server-side starting with RabbitMQ 3.0.
+                #:on_tcp_connection_failure (#call) - A callable object that will be run if connection to server fails
+                #:on_possible_authentication_failure (#call) - A callable object that will be run if authentication fails (see Authentication failure section)
+                reconnect_delay: 20 # (Fixnum) - Delay in seconds before attempting reconnect on detected failure
+            }.merge(opts)
 
-          unless (@url = @opts.delete(:url))
-            raise "Missing 'url' option for AQMP layer"
+            unless (@url = @opts.delete(:url))
+              raise "Missing 'url' option for AQMP layer"
+            end
+            @address_prefix = @url + '/frcp.'
+            _connect()
+            super
+          else
+            true
           end
-          @address_prefix = @url + '/frcp.'
-          _connect()
-          super
         end
 
         def conn_info
@@ -191,7 +196,7 @@ module OmfCommon
               #_reconnect "Appear to have lost heartbeat. Attempt to reconnect in #{rec_delay} sec"
             end
             @session.on_recovery do
-              info 'Recovered!'
+              info 'Recovered AMQP connection, resending each stored calls!'
               last_reported_timestamp = nil
               @on_reconnect.values.each do |block|
                 block.call()

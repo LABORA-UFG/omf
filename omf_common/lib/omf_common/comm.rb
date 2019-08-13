@@ -173,27 +173,13 @@ module OmfCommon
     def initialize(opts = {})
       @opts = opts
       @opts[:root_resource] = true
-      # unless local_address = opts[:local_address]
-      #   hostname = nil
-      #   begin
-      #     hostname = Socket.gethostbyname(Socket.gethostname)[0]
-      #   rescue
-      #     hostname = (`hostname` || 'unknown').strip
-      #   end
-      #   local_address = "#{hostname}-#{Process.pid}"
-      # end
-
-      # always prepend topic names
-      hostname = nil
-      begin
-        hostname = Socket.gethostbyname(Socket.gethostname)[0]
-      rescue
-        hostname = (`hostname` || 'unknown').strip
-      end
-
-      if @opts[:type]
-        local_address = "#{hostname}-#{@opts[:type]}-#{Process.pid}"
-      else
+      unless local_address = opts[:local_address]
+        hostname = nil
+        begin
+          hostname = Socket.gethostbyname(Socket.gethostname)[0]
+        rescue
+          hostname = (`hostname` || 'unknown').strip
+        end
         local_address = "#{hostname}-#{Process.pid}"
       end
 

@@ -124,7 +124,22 @@ class OmfRc::ResourceProxy::AbstractResource
     @creation_opts = Hashie::Mash.new(DEFAULT_CREATION_OPTS.merge(creation_opts))
 
     @type = type
-    @uid = (@opts.delete(:uid) || SecureRandom.uuid).to_s
+    @uid = @opts.delete(:uid)
+    unless @uid
+      hostname = nil
+      begin
+        hostname = Socket.gethostbyname(Socket.gethostname)[0]
+      rescue
+        hostname = (`hostname` || 'unknown').strip
+      end
+      @uid = "#{hostname}-#{Process.pid}-#{@type}-#{SecureRandom.uuid}"
+    end
+    unless @uid.kind_of?(String)
+      @uid = @uid.to_s
+    end
+
+    # Old uid approach
+    # @uid = (@opts.delete(:uid) || SecureRandom.uuid).to_s
 
     # Direct federation uid set
     federation_set = false

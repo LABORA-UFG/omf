@@ -283,7 +283,7 @@ module OmfRc::ResourceProxy::VirtualMachine
         debug "Checking if virtual machine '#{resource.property.label}' is available"
         resource.property.broker_topic.create(:vm_inventory, {:label => resource.property.label}) do |msg|
           if msg.error?
-            error = "The virtual machine '#{resource.property.label}' is not available"
+            error = "The virtual machine '#{resource.property.label}' is not available on broker"
             resource.log_inform_error(error)
           else
             debug "Virtual machine '#{resource.property.label}' AVAILABLE!"
@@ -303,17 +303,21 @@ module OmfRc::ResourceProxy::VirtualMachine
   work :send_vm_im_ok do |resource|
     thread = Thread.new {
       debug "Starting VM_IMOK inform send to OMF_EC until a configure message is not received..."
-      until resource.property.imOk
+      sending_count = 0
+      while resource.property.imOk === false && sending_count < 25
         debug "Sending VM_IMOK message..."
-        sleep 1
         resource.inform(:VM_IMOK, {:info => "I am Ok"})
+        sending_count = sending_count + 1
+        sleep 1
       end
-      debug "Configure received, stopping VM_IMOK messages sending..."
+
+      if resource.property.imOk
+        debug "Configure received and VM is OK, stopping VM_IMOK messages sending..."
+      elsif sending_count >= 25
+        error "VM is not ok after 25 seconds, stopping and releasing VM resource"
+        resource.release_actions
+      end
     }
-    OmfCommon.el.after(25) do ||
-      thread.exit
-      resource.release_actions unless resource.property.imOk
-    end
     thread
   end
 
@@ -364,12 +368,18 @@ module OmfRc::ResourceProxy::VirtualMachine
   # Checks if resource is ready to receive configure commands
   configure_all do |res, conf_props, conf_result|
     res.property.imOk = true
+    debug "configure_all successfully received!"
     if res.property.started && res.property.broker_vm_topic.nil?
+      error "This virtual machine '#{res.property.label}' is not avaiable, so nothing can be configured"
       raise "This virtual machine '#{res.property.label}' is not avaiable, so nothing can be configured"
     end
 
     if res.property.started
-      conf_props.each { |k, v| conf_result[k] = res.__send__("configure_#{k}", v) }
+      conf_props.each do |k, v|
+        debug "Sending configure_#{k} with value #{v.to_s}"
+        conf_result[k] = res.__send__("configure_#{k}", v)
+        debug "Result of configure_#{k}: #{conf_result[k].to_s}"
+      end
     else
       configure_call = {
           :conf_props => conf_props,
@@ -694,7 +704,6 @@ module OmfRc::ResourceProxy::VirtualMachine
               if msg.itype == 'BOOT.INITIALIZED' || msg.itype == 'BOOT.DONE'
                 started = true
               end
-
             end
           end
         end
@@ -720,6 +729,7 @@ module OmfRc::ResourceProxy::VirtualMachine
         debug "#{res.uid} - update_vm_state: Updating VM state. Thread id: #{Thread.current.object_id}"
         old_state = res.property.state
         state = res.check_vm_state(res)
+        debug "OLD state: #{old_state}, NEW STATE: #{state}"
         if state == STATE_DOWN or state == STATE_NOT_CREATED and (old_state != STATE_DOWN and old_state != STATE_NOT_CREATED)
           res.release_actions
         end

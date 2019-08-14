@@ -96,6 +96,10 @@ module OmfEc::Vm
                 wblock.call if wblock
               end
             end
+
+            if msg.itype == 'INFO'
+              info "#{@name}: #{msg.properties[:info]}"
+            end
           end
         end
       end

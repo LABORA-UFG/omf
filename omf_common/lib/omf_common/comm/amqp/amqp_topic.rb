@@ -104,15 +104,11 @@ module OmfCommon
 
         def _init_amqp()
           channel = @communicator.channel
-          @exchange = channel.topic(id, :auto_delete => true, :durable => true)
+          @exchange = channel.topic(id, :auto_delete => true)
 
           hostname = (`hostname` || 'unknown').strip
-          if @parent == @id
-            queue_name = "#{hostname}-#{Process.pid}_#{@id}-#{SecureRandom.uuid}"
-          else
-            queue_name = "#{hostname}-#{Process.pid}_#{@parent}_#{@id}-#{SecureRandom.uuid}"
-          end
-          channel.queue(queue_name, :auto_delete => true, :durable => true) do |queue|
+          queue_name = "#{hostname}-#{Process.pid}_#{@parent}_#{@id}-#{SecureRandom.uuid}"
+          channel.queue(queue_name, :auto_delete => true) do |queue|
             queue.bind(@exchange, routing_key: @routing_key) do ||
               debug "Subscribed to '#@id'"
               # Call all accumulated on_subscribed handlers

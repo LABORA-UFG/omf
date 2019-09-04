@@ -61,13 +61,21 @@ module OmfCommon
             if @children and opts[:release_childs]
               @children.each_with_index do |child, index|
                 if index == @children.size - 1
-                  self.release(@@name2inst[child], {:delete => true}) do |msg|
-                    @exchange.delete
-                    channel = @communicator.channel
-                    channel.exchanges.delete(key.to_sym)
+                  for name, topic in @@name2inst
+                    if topic.id == child
+                      self.release(@@name2inst[name], {:delete => true}) do |msg|
+                        @exchange.delete
+                        channel = @communicator.channel
+                        channel.exchanges.delete(key.to_sym)
+                      end
+                    end
                   end
                 else
-                  self.release(@@name2inst[child], {:delete => true})
+                  for name, topic in @@name2inst
+                    if topic.id == child
+                      self.release(@@name2inst[name], {:delete => true})
+                    end
+                  end
                 end
               end
             else

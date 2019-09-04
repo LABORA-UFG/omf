@@ -72,10 +72,10 @@ module OmfCommon
           info "Disconnecting..."
           topics = Hash.new.merge(OmfCommon::Comm::Topic.name2inst)
           for name, topic in topics
-            topic.inform(:TOPIC_DELETED, {:topic => name}) if topic.root_resource
-            info "DISCONECT TOPIC = #{name}, topic.root_resource = #{topic.root_resource}"
+            topic.inform(:TOPIC_DELETED, {:topic => topic.id}) if topic.root_resource
+            info "DISCONECT TOPIC = #{topic.id}, topic.root_resource = #{topic.root_resource}"
             opts[:delete] = true
-            topic.unsubscribe(name, opts) if topic.root_resource
+            topic.unsubscribe(topic.id, opts) if topic.root_resource
           end
 
           @session.close {

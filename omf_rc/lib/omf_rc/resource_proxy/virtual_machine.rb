@@ -346,8 +346,8 @@ module OmfRc::ResourceProxy::VirtualMachine
           mac_regex = Regexp.new(Regexp.quote(res.property.mac_address))
           am_controller_topic_regex = Regexp.new(Regexp.quote(vm_topic.id))
           debug "REGEX: #{mac_regex}, #{am_controller_topic_regex}"
-          if name =~ mac_regex or name =~ am_controller_topic_regex
-            topic.unsubscribe(name, {:delete => true})
+          if topic.id =~ mac_regex or topic.id =~ am_controller_topic_regex
+            topic.unsubscribe(topic.id, {:delete => true})
             OmfCommon::Comm::Topic.name2inst.delete(name)
           end
         end
@@ -578,8 +578,8 @@ module OmfRc::ResourceProxy::VirtualMachine
           for name, topic in topics
             am_controller_topic_regex = Regexp.new(Regexp.quote(vm_topic.id))
             debug "REGEX: #{am_controller_topic_regex}"
-            if name =~ am_controller_topic_regex
-              topic.unsubscribe(name, {:delete => true})
+            if topic.id =~ am_controller_topic_regex
+              topic.unsubscribe(topic.id, {:delete => true})
               OmfCommon::Comm::Topic.name2inst.delete(name)
             end
           end

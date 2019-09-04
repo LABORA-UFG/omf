@@ -24,28 +24,30 @@ module OmfCommon
 
       def self.create(name, opts = {}, &block)
         # Force string conversion as 'name' can be an ExperimentProperty
+        routing_key_name = opts[:routing_key] ? opts[:routing_key].to_s : 'o.*'
         name = name.to_s.to_sym
+        name2InstName = "#{name.to_s}-#{routing_key_name}".to_sym
         @@lock.synchronize do
-          unless @@name2inst[name]
-            debug "New topic: #{name} | #{opts[:routing_key]}"
-            #opts[:address] ||= address_for(name)
-            @@name2inst[name] = self.new(name, opts, &block)
+          if @@name2inst[name2InstName]
+            debug "Existing topic: #{name} | #{@@name2inst[name2InstName].routing_key} | #{name2InstName}"
+            block.call(@@name2inst[name2InstName]) if block
           else
-            debug "Existing topic: #{name} | #{@@name2inst[name].routing_key}"
-            block.call(@@name2inst[name]) if block
+            debug "New topic: #{name} | #{opts[:routing_key]} | #{name2InstName}"
+            #opts[:address] ||= address_for(name)
+            @@name2inst[name2InstName] = self.new(name, opts, &block)
           end
           @root_resource = opts[:root_resource]
           unless @root_resource
-            @@name2inst[name].on_inform do |msg|
+            @@name2inst[name2InstName].on_inform do |msg|
               debug "#{name}: MESSAGE ON INFORM IS #{msg.itype}"
               case msg.itype
                 when 'TOPIC.DELETED'
                   debug "MESSAGE TO DELETE TOPIC: #{msg[:topic]}"
-                  @@name2inst[name].unsubscribe(msg[:topic], {:delete => true})
+                  @@name2inst[name2InstName].unsubscribe(msg[:topic], {:delete => true})
               end
             end
           end
-          @@name2inst[name]
+          @@name2inst[name2InstName]
         end
       end
 
@@ -186,16 +188,20 @@ module OmfCommon
         debug "OPTS IN INITIALIZE TOPIC = #{opts.to_yaml}"
         if opts[:parent]
           parent = opts[:parent].to_sym
-          if @@name2inst[parent]
-            @@name2inst[parent].add_child(id)
+          for name, topic in @@name2inst
+            if topic.id == parent
+              @@name2inst[name].add_child(id)
+            end
           end
         end
         if opts[:parent_address]
           parent_address = opts[:parent_address] || "orphan"
           #parent_address = parent_address[:parent_address] if parent_address.is_a? Hash
           parent_address = parent_address.to_sym
-          if @@name2inst[parent_address]
-            @@name2inst[parent_address].add_subtopic(id)
+          for name, topic in @@name2inst
+            if topic.id == parent_address
+              @@name2inst[name].add_subtopic(id)
+            end
           end
         end
         #@address = opts[:address]

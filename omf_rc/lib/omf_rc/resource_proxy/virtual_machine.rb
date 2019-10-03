@@ -289,7 +289,11 @@ module OmfRc::ResourceProxy::VirtualMachine
             debug "Virtual machine '#{resource.property.label}' AVAILABLE!"
             resource.inform(:info, Hashie::Mash.new({:info => "Broker VM successfully got!"}))
             resource.property.broker_vm_topic = msg.resource
-            resource.get_vm_opts
+            Thread.new {
+              debug "Waiting 5 seconds before get vm '#{resource.property.label}' opts..."
+              sleep 5
+              resource.get_vm_opts
+            }
           end
         end
       end
